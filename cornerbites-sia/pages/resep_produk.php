@@ -118,7 +118,7 @@ try {
 
             // 1. BIAYA BAHAN BAKU - Ambil semua item resep untuk perhitungan HPP
             $stmtAllRecipes = $conn->prepare("
-                SELECT pr.id, pr.quantity_used, pr.unit_measurement,
+                SELECT pr.id, pr.raw_material_id, pr.quantity_used, pr.unit_measurement,
                        rm.name AS raw_material_name, 
                        COALESCE(rm.purchase_price_per_unit, 0) as purchase_price_per_unit, 
                        COALESCE(rm.default_package_quantity, 1) as default_package_quantity, 
@@ -148,6 +148,7 @@ try {
 
                 $recipeDetails[] = [
                     'id' => $item['id'],
+                    'raw_material_id' => $item['raw_material_id'],
                     'name' => $item['raw_material_name'],
                     'type' => $item['type'],
                     'quantity_used' => $item['quantity_used'],
@@ -327,6 +328,19 @@ try {
                     </div>
                 </div>
 
+                <!-- Tampilan ketika belum ada produk yang dipilih -->
+                <?php if (!$selectedProductId): ?>
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center">
+                        <div class="p-4 bg-blue-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                            <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Pilih produk terlebih dahulu untuk mengelola resep dan melihat kalkulasi HPP</h3>
+                        <p class="text-gray-600">Gunakan dropdown di atas untuk memilih produk yang ingin dikelola resepnya</p>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($selectedProductId && $selectedProduct): ?>
                     <!-- Bagian Kalkulasi HPP -->
                     <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8">
@@ -376,7 +390,7 @@ try {
                                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                             <span class="text-gray-500 text-sm font-medium">Rp</span>
                                         </div>
-                                        <input type="text" id="sale_price_display" class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="Masukkan harga jual" oninput="formatRupiah(this, 'sale_price')" value="<?php echo $selectedProduct['sale_price'] ? number_format($selectedProduct['sale_price'], 0, ',', '.') : ''; ?>" required>
+                                        <input type="text" id="sale_price_display" class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="Masukkan harga jual"  value="<?php echo $selectedProduct['sale_price'] ? number_format($selectedProduct['sale_price'], 0, ',', '.') : ''; ?>" required>
                                         <input type="hidden" id="sale_price" name="sale_price" value="<?php echo htmlspecialchars($selectedProduct['sale_price'] ?? 0); ?>" required>
                                     </div>
                                     <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -589,9 +603,7 @@ try {
                                         Detail Biaya Bahan Baku:
                                     </h4>
                                     <div class="space-y-3">
-                                        <?php foreach ($hppCalculation['recipe_details'] as $detail): 
-                                            $recipeItem = $recipeItemsMapping[$detail['id']] ?? null;
-                                        ?>
+                                        <?php foreach ($hppCalculation['recipe_details'] as $detail): ?>
                                             <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                                                 <div class="flex-1">
                                                     <span class="font-medium text-gray-900"><?php echo htmlspecialchars($detail['name']); ?></span>
@@ -604,13 +616,11 @@ try {
                                                 </div>
                                                 <div class="flex-1 text-right flex items-center justify-end space-x-2">
                                                     <span class="font-semibold text-gray-900">Rp <?php echo number_format($detail['cost_per_item'], 0, ',', '.'); ?></span>
-                                                    <?php if ($recipeItem): ?>
-                                                    <button onclick="editRecipeItem({id: <?php echo $detail['id']; ?>, raw_material_id: '<?php echo $recipeItem['raw_material_id']; ?>', raw_material_type: '<?php echo $recipeItem['type']; ?>', name: '<?php echo htmlspecialchars($detail['name']); ?>', quantity_used: <?php echo $detail['quantity_used']; ?>, unit_measurement: '<?php echo $recipeItem['unit_measurement']; ?>'})" class="text-blue-600 hover:text-blue-800" title="Edit item">
+                                                    <button onclick="editRecipeItem({id: <?php echo $detail['id']; ?>, raw_material_id: '<?php echo $detail['raw_material_id']; ?>', raw_material_type: '<?php echo $detail['type']; ?>', name: '<?php echo htmlspecialchars($detail['name']); ?>', quantity_used: <?php echo $detail['quantity_used']; ?>, unit_measurement: '<?php echo $detail['unit_measurement']; ?>'})" class="text-blue-600 hover:text-blue-800" title="Edit item">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                                         </svg>
                                                     </button>
-                                                    <?php endif; ?>
                                                     <button onclick="deleteRecipeItem(<?php echo $detail['id']; ?>)" class="text-red-600 hover:text-red-800" title="Hapus dari resep">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -884,7 +894,7 @@ try {
                                                 ");
                                                 $stmtAvailableOverhead->execute([$selectedProductId]);
                                                 $availableOverheads = $stmtAvailableOverhead->fetchAll(PDO::FETCH_ASSOC);
-                                                
+
                                                 foreach ($availableOverheads as $overhead):
                                             ?>
                                                 <option value="<?php echo htmlspecialchars($overhead['id']); ?>" 
@@ -904,7 +914,7 @@ try {
                                         </select>
                                         <p class="text-xs text-gray-500 mt-2">Pilih item overhead yang akan ditambahkan ke resep produk ini</p>
                                     </div>
-                                    
+
                                     <button type="submit" id="manual-submit-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
                                         <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -935,7 +945,7 @@ try {
                                                 ");
                                                 $stmtAvailableLabor->execute([$selectedProductId]);
                                                 $availableLabors = $stmtAvailableLabor->fetchAll(PDO::FETCH_ASSOC);
-                                                
+
                                                 foreach ($availableLabors as $labor):
                                             ?>
                                                 <option value="<?php echo htmlspecialchars($labor['id']); ?>" 
@@ -952,7 +962,7 @@ try {
                                         </select>
                                         <p class="text-xs text-gray-500 mt-2">Sistem akan menggunakan nilai default dari pengaturan overhead & tenaga kerja</p>
                                     </div>
-                                    
+
                                     <button type="submit" class="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                         <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -986,400 +996,9 @@ try {
     </div>
 </div>
 
-<!-- Modal Edit Resep -->
-<div id="editRecipeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg w-full max-w-md">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Edit Item Resep</h3>
-                    <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-
-                <form action="../process/simpan_resep_produk.php" method="POST" id="editRecipeForm">
-                    <input type="hidden" name="action" value="edit_recipe">
-                    <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($selectedProductId); ?>">
-                    <input type="hidden" name="recipe_id" id="editRecipeId">
-
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Nama Bahan/Kemasan</label>
-                            <input type="text" id="editRecipeName" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah</label>
-                                <input type="number" step="0.001" name="quantity_used" id="editRecipeQuantity" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Satuan</label>
-                                <select name="unit_measurement" id="editRecipeUnit" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                    <?php foreach ($recipeUnitOptions as $unit): ?>
-                                        <option value="<?php echo htmlspecialchars($unit); ?>"><?php echo htmlspecialchars($unit); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="flex gap-3">
-                            <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                Simpan Perubahan
-                            </button>
-                            <button type="button" onclick="closeEditModal()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                                Batal
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-// JavaScript Functions
-function formatRupiah(input, targetId) {
-    let value = input.value.replace(/[^\d]/g, '');
-    let formattedValue = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    input.value = formattedValue;
-    document.getElementById(targetId).value = value;
-}
-
-function setSalePrice(price, margin) {
-    document.getElementById('sale_price_display').value = price.toLocaleString('id-ID');
-    document.getElementById('sale_price').value = Math.round(price);
-    
-    // Highlight the clicked margin button
-    const buttons = document.querySelectorAll('[onclick^="setSalePrice"]');
-    buttons.forEach(btn => btn.classList.remove('ring-2', 'ring-green-500'));
-    event.target.closest('div').classList.add('ring-2', 'ring-green-500');
-}
-
-function showBreakdownTab(tabName) {
-    // Hide semua content
-    document.getElementById('content-bahan_baku').classList.add('hidden');
-    document.getElementById('content-tenaga_kerja').classList.add('hidden');
-    document.getElementById('content-overhead').classList.add('hidden');
-
-    // Reset semua tab button
-    document.getElementById('tab-bahan_baku').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
-    document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
-    document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
-
-    // Reset badges
-    document.getElementById('badge-bahan_baku').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
-    document.getElementById('badge-tenaga_kerja').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
-    document.getElementById('badge-overhead').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
-
-    // Show content yang dipilih
-    document.getElementById('content-' + tabName).classList.remove('hidden');
-
-    // Set active tab
-    if (tabName === 'bahan_baku') {
-        document.getElementById('tab-bahan_baku').className = 'px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50';
-        document.getElementById('badge-bahan_baku').className = 'bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full';
-    } else if (tabName === 'tenaga_kerja') {
-        document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-orange-600 border-b-2 border-orange-600 bg-orange-50';
-        document.getElementById('badge-tenaga_kerja').className = 'bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full';
-    } else if (tabName === 'overhead') {
-        document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-purple-600 border-b-2 border-purple-600 bg-purple-50';
-        document.getElementById('badge-overhead').className = 'bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full';
-    }
-}
-
-function switchRecipeTab(tabType) {
-    const select = document.getElementById('recipe-select');
-    const options = select.querySelectorAll('option');
-    
-    // Hide all options first
-    options.forEach(option => {
-        if (option.value !== '') {
-            option.style.display = 'none';
-        }
-    });
-    
-    // Show options for selected type
-    options.forEach(option => {
-        if (option.value === '' || option.dataset.type === tabType) {
-            option.style.display = 'block';
-        }
-    });
-    
-    // Update form elements
-    const actionInput = document.getElementById('recipe-action');
-    const label = document.getElementById('recipe-label');
-    const submitText = document.getElementById('recipe-submit-text');
-    const formTitle = document.getElementById('recipe-form-title');
-    const formDesc = document.getElementById('recipe-form-desc');
-    
-    if (tabType === 'bahan') {
-        actionInput.value = 'add_bahan';
-        label.textContent = 'Pilih Bahan Baku';
-        submitText.textContent = 'Tambah Bahan Baku';
-        formTitle.textContent = 'Bahan Baku & Kemasan';
-        formDesc.textContent = 'Tambahkan bahan baku yang digunakan dalam resep';
-        select.innerHTML = '<option value="">-- Pilih Bahan Baku --</option>' + 
-                          Array.from(options).filter(opt => opt.value === '' || opt.dataset.type === 'bahan').map(opt => opt.outerHTML).join('');
-    } else {
-        actionInput.value = 'add_kemasan';
-        label.textContent = 'Pilih Kemasan';
-        submitText.textContent = 'Tambah Kemasan';
-        formTitle.textContent = 'Bahan Baku & Kemasan';
-        formDesc.textContent = 'Tambahkan kemasan yang digunakan dalam resep';
-        select.innerHTML = '<option value="">-- Pilih Kemasan --</option>' + 
-                          Array.from(options).filter(opt => opt.value === '' || opt.dataset.type === 'kemasan').map(opt => opt.outerHTML).join('');
-    }
-    
-    // Update tab appearance
-    document.getElementById('tab-bahan').classList.toggle('border-blue-600', tabType === 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('text-blue-600', tabType === 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('border-transparent', tabType !== 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('text-gray-500', tabType !== 'bahan');
-    
-    document.getElementById('tab-kemasan').classList.toggle('border-blue-600', tabType === 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('text-blue-600', tabType === 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('border-transparent', tabType !== 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('text-gray-500', tabType !== 'kemasan');
-    
-    // Reset form
-    document.getElementById('recipe-main-form').reset();
-    document.getElementById('recipe-action').value = tabType === 'bahan' ? 'add_bahan' : 'add_kemasan';
-    document.getElementById('recipe-edit-id').value = '';
-    document.getElementById('recipe-cancel-btn').classList.add('hidden');
-}
-
-function switchManualTab(type) {
-    const overheadTab = document.getElementById('manual-tab-overhead');
-    const laborTab = document.getElementById('manual-tab-labor');
-    const overheadContent = document.getElementById('manual-content-overhead');
-    const laborContent = document.getElementById('manual-content-labor');
-    const action = document.getElementById('manual-action');
-    const submitText = document.getElementById('manual-submit-text');
-    const submitBtn = document.getElementById('manual-submit-btn');
-
-    // Reset tabs
-    overheadTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
-    laborTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
-
-    // Hide all content
-    overheadContent.classList.add('hidden');
-    laborContent.classList.add('hidden');
-
-    // Get select elements
-    const overheadSelect = document.getElementById('manual-overhead-select');
-    const laborSelect = document.getElementById('manual-labor-select');
-
-    if (type === 'overhead') {
-        overheadTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-purple-600 text-purple-600';
-        overheadContent.classList.remove('hidden');
-        action.value = 'add_manual_overhead';
-        submitText.textContent = 'Tambah Overhead ke Resep';
-        submitBtn.className = 'w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500';
-
-        // Enable overhead select, disable labor select
-        if (overheadSelect) {
-            overheadSelect.disabled = false;
-            overheadSelect.setAttribute('name', 'overhead_id');
-        }
-        if (laborSelect) {
-            laborSelect.disabled = true;
-            laborSelect.removeAttribute('name');
-            laborSelect.value = '';
-        }
-    } else if (type === 'labor') {
-        laborTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-orange-600 text-orange-600';
-        laborContent.classList.remove('hidden');
-        action.value = 'add_manual_labor';
-        submitText.textContent = 'Tambah Tenaga Kerja ke Resep';
-        submitBtn.className = 'w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500';
-
-        // Enable labor select, disable overhead select
-        if (laborSelect) {
-            laborSelect.disabled = false;
-            laborSelect.setAttribute('name', 'labor_id');
-        }
-        if (overheadSelect) {
-            overheadSelect.disabled = true;
-            overheadSelect.removeAttribute('name');
-            overheadSelect.value = '';
-        }
-    }
-}
-
-function editRecipeItem(item) {
-    console.log('Editing item:', item); // Debug log
-    
-    const form = document.getElementById('recipe-main-form');
-    const title = document.getElementById('recipe-form-title');
-    const desc = document.getElementById('recipe-form-desc');
-    const editId = document.getElementById('recipe-edit-id');
-    const select = document.getElementById('recipe-select');
-    const quantity = document.getElementById('recipe-quantity');
-    const unit = document.getElementById('recipe-unit');
-    const action = document.getElementById('recipe-action');
-    const submitText = document.getElementById('recipe-submit-text');
-    const submitBtn = document.getElementById('recipe-submit-btn');
-    const cancelBtn = document.getElementById('recipe-cancel-btn');
-
-    // Set edit mode
-    editId.value = item.id;
-    action.value = 'edit';
-
-    // Format quantity to remove unnecessary zeros
-    const formattedQuantity = parseFloat(item.quantity_used).toString();
-    quantity.value = formattedQuantity;
-    unit.value = item.unit_measurement;
-
-    // Switch to appropriate tab and set the select value
-    if (item.raw_material_type === 'bahan') {
-        switchRecipeTab('bahan');
-        title.textContent = 'Edit Bahan Baku';
-        desc.textContent = 'Update komposisi bahan baku dalam resep';
-        submitText.textContent = 'Update Bahan Baku';
-        submitBtn.className = 'flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-    } else {
-        switchRecipeTab('kemasan');
-        title.textContent = 'Edit Kemasan';
-        desc.textContent = 'Update komposisi kemasan dalam resep';
-        submitText.textContent = 'Update Kemasan';
-        submitBtn.className = 'flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-    }
-
-    // Set the select value after switching tabs
-    setTimeout(() => {
-        select.value = item.raw_material_id;
-        console.log('Set select value to:', item.raw_material_id); // Debug log
-    }, 100);
-
-    // Show cancel button
-    cancelBtn.classList.remove('hidden');
-
-    // Scroll to form
-    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function closeEditModal() {
-    document.getElementById('editRecipeModal').classList.add('hidden');
-}
-
-function deleteRecipeItem(recipeId) {
-    if (confirm('Apakah Anda yakin ingin menghapus item ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = '<?php echo htmlspecialchars($selectedProductId); ?>';
-
-        const recipeIdInput = document.createElement('input');
-        recipeIdInput.type = 'hidden';
-        recipeIdInput.name = 'recipe_id';
-        recipeIdInput.value = recipeId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(recipeIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function deleteManualLabor(laborManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus tenaga kerja ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_labor';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = '<?php echo htmlspecialchars($selectedProductId); ?>';
-
-        const laborIdInput = document.createElement('input');
-        laborIdInput.type = 'hidden';
-        laborIdInput.name = 'labor_manual_id';
-        laborIdInput.value = laborManualId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(laborIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function deleteManualOverhead(overheadManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus overhead ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_overhead';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = '<?php echo htmlspecialchars($selectedProductId); ?>';
-
-        const overheadIdInput = document.createElement('input');
-        overheadIdInput.type = 'hidden';
-        overheadIdInput.name = 'overhead_manual_id';
-        overheadIdInput.value = overheadManualId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(overheadIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function resetRecipeForm() {
-    document.getElementById('recipe-main-form').reset();
-    document.getElementById('recipe-action').value = 'add_bahan';
-    document.getElementById('recipe-edit-id').value = '';
-    document.getElementById('recipe-cancel-btn').classList.add('hidden');
-    document.getElementById('recipe-submit-text').textContent = 'Tambah Bahan Baku';
-    switchRecipeTab('bahan');
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize form dengan tab bahan
-    switchRecipeTab('bahan');
-    
-    // Initialize manual tab dengan overhead
-    switchManualTab('overhead');
-    
-    // Format existing sale price display
-    const salePriceValue = document.getElementById('sale_price').value;
-    if (salePriceValue) {
-        document.getElementById('sale_price_display').value = parseInt(salePriceValue).toLocaleString('id-ID');
-    }
-});
+// Set global variable for selected product ID yang dibutuhkan JavaScript
+window.selectedProductId = '<?php echo htmlspecialchars($selectedProductId); ?>';
 </script>
 
 <script src="../assets/js/resep_produk.js"></script>

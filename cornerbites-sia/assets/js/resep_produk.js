@@ -14,6 +14,7 @@ function formatRupiah(element, hiddenInputId) {
     let formatted = new Intl.NumberFormat('id-ID').format(value);
     element.value = formatted;
     document.getElementById(hiddenInputId).value = value;
+    document.getElementById(hiddenInputId).value = value;
 }
 
 function showEditForm(item) {
@@ -45,9 +46,9 @@ function showEditForm(item) {
         block: 'start' 
     });
 
-        // Format quantity to remove unnecessary zeros
-        const formattedQuantity = parseFloat(item.quantity_used).toString();
-        document.getElementById('edit_quantity_used').value = formattedQuantity;
+    // Format quantity to remove unnecessary zeros
+    const formattedQuantity = parseFloat(item.quantity_used).toString();
+    document.getElementById('edit_quantity_used').value = formattedQuantity;
 }
 
 function hideEditForm() {
@@ -111,58 +112,78 @@ function showEditCategoryTab(categoryName) {
     }
 }
 
-// Edit recipe item - Fungsi yang bekerja dengan form edit
 function editRecipeItem(item) {
-    console.log('Editing recipe item:', item);
-    
-    // Set form ke mode edit
-    document.getElementById('recipe-edit-id').value = item.id;
-    document.getElementById('recipe-action').value = 'edit_recipe';
-    
-    // Tentukan tab berdasarkan tipe material
-    const tabType = item.raw_material_type === 'kemasan' ? 'kemasan' : 'bahan';
-    
-    // Switch ke tab yang sesuai
-    switchRecipeTab(tabType);
-    
-    // Isi form dengan data yang akan diedit
-    document.getElementById('recipe-quantity').value = parseFloat(item.quantity_used).toString();
-    document.getElementById('recipe-unit').value = item.unit_measurement;
-    
-    // Set dropdown ke material yang sedang diedit
+    console.log('Editing item:', item);
+
+    const form = document.getElementById('recipe-main-form');
+    const title = document.getElementById('recipe-form-title');
+    const desc = document.getElementById('recipe-form-desc');
+    const editId = document.getElementById('recipe-edit-id');
     const select = document.getElementById('recipe-select');
-    select.value = item.raw_material_id;
-    
-    // Update tampilan form
-    const formTitle = document.getElementById('recipe-form-title');
-    const formDesc = document.getElementById('recipe-form-desc');
+    const quantity = document.getElementById('recipe-quantity');
+    const unit = document.getElementById('recipe-unit');
+    const action = document.getElementById('recipe-action');
     const submitText = document.getElementById('recipe-submit-text');
     const submitBtn = document.getElementById('recipe-submit-btn');
     const cancelBtn = document.getElementById('recipe-cancel-btn');
-    
-    if (tabType === 'kemasan') {
-        formTitle.textContent = 'Edit Kemasan';
-        formDesc.textContent = 'Ubah data kemasan yang digunakan dalam resep';
-        submitText.textContent = 'Update Kemasan';
-        submitBtn.className = 'flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-    } else {
-        formTitle.textContent = 'Edit Bahan Baku';
-        formDesc.textContent = 'Ubah data bahan baku yang digunakan dalam resep';
+
+    // Set edit mode
+    editId.value = item.id;
+    action.value = 'edit';
+
+    // Format quantity to remove unnecessary zeros
+    const formattedQuantity = parseFloat(item.quantity_used).toString();
+    quantity.value = formattedQuantity;
+    unit.value = item.unit_measurement;
+
+    // Switch to appropriate tab first
+    if (item.raw_material_type === 'bahan') {
+        switchRecipeTab('bahan');
+        title.textContent = 'Edit Bahan Baku';
+        desc.textContent = 'Update komposisi bahan baku dalam resep';
         submitText.textContent = 'Update Bahan Baku';
         submitBtn.className = 'flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+    } else {
+        switchRecipeTab('kemasan');
+        title.textContent = 'Edit Kemasan';
+        desc.textContent = 'Update komposisi kemasan dalam resep';
+        submitText.textContent = 'Update Kemasan';
+        submitBtn.className = 'flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
     }
-    
+
+    // Set the select value after a longer delay to ensure options are loaded
+    setTimeout(() => {
+        // Ensure all options are visible first
+        const options = select.querySelectorAll('option');
+        options.forEach(option => {
+            option.style.display = 'block';
+        });
+
+        // Set the value
+        select.value = item.raw_material_id;
+        console.log('Set select value to:', item.raw_material_id);
+
+        // Re-apply tab filtering
+        if (item.raw_material_type === 'bahan') {
+            options.forEach(option => {
+                if (option.value !== '' && option.dataset.type !== 'bahan') {
+                    option.style.display = 'none';
+                }
+            });
+        } else {
+            options.forEach(option => {
+                if (option.value !== '' && option.dataset.type !== 'kemasan') {
+                    option.style.display = 'none';
+                }
+            });
+        }
+    }, 200);
+
     // Show cancel button
     cancelBtn.classList.remove('hidden');
-    
-    // Scroll ke form section - cari form container yang tepat
-    const formContainer = document.querySelector('form[action="../process/simpan_resep_produk.php"]').closest('.bg-white.rounded-xl.shadow-lg');
-    if (formContainer) {
-        formContainer.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-        });
-    }
+
+    // Scroll to form
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function closeEditModal() {
@@ -350,11 +371,25 @@ function showBreakdownTab(tabName) {
     document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
     document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
 
+    // Reset badges
+    document.getElementById('badge-bahan_baku').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
+    document.getElementById('badge-tenaga_kerja').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
+    document.getElementById('badge-overhead').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
+
     // Show content yang dipilih
     document.getElementById('content-' + tabName).classList.remove('hidden');
 
     // Set active tab
-    document.getElementById('tab-' + tabName).className = 'px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50';
+    if (tabName === 'bahan_baku') {
+        document.getElementById('tab-bahan_baku').className = 'px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50';
+        document.getElementById('badge-bahan_baku').className = 'bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full';
+    } else if (tabName === 'tenaga_kerja') {
+        document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-orange-600 border-b-2 border-orange-600 bg-orange-50';
+        document.getElementById('badge-tenaga_kerja').className = 'bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full';
+    } else if (tabName === 'overhead') {
+        document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-purple-600 border-b-2 border-purple-600 bg-purple-50';
+        document.getElementById('badge-overhead').className = 'bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full';
+    }
 }
 
 // Function untuk menampilkan tab kategori bahan/kemasan
@@ -478,7 +513,7 @@ function hideAllForms() {
 function switchRecipeTab(tabType) {
     const select = document.getElementById('recipe-select');
     const editId = document.getElementById('recipe-edit-id');
-    const currentSelectValue = select.value; // Preserve current selection
+    const currentSelectValue = select ? select.value : '';
     const isEditMode = editId && editId.value !== '';
 
     // Update form elements
@@ -491,70 +526,89 @@ function switchRecipeTab(tabType) {
 
     if (tabType === 'bahan') {
         if (!isEditMode) {
-            actionInput.value = 'add_bahan';
-            submitText.textContent = 'Tambah Bahan Baku';
-            formTitle.textContent = 'Bahan Baku & Kemasan';
-            formDesc.textContent = 'Tambahkan bahan baku yang digunakan dalam resep';
-            submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-indigo-600', 'hover:bg-indigo-700');
-            submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            if (actionInput) actionInput.value = 'add_bahan';
+            if (submitText) submitText.textContent = 'Tambah Bahan Baku';
+            if (formTitle) formTitle.textContent = 'Bahan Baku & Kemasan';
+            if (formDesc) formDesc.textContent = 'Tambahkan bahan baku yang digunakan dalam resep';
+            if (submitBtn) {
+                submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-indigo-600', 'hover:bg-indigo-700');
+                submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }
         }
-        label.textContent = 'Pilih Bahan Baku';
+        if (label) label.textContent = 'Pilih Bahan Baku';
 
         // Show/hide options for bahan
-        Array.from(select.options).forEach(option => {
-            if (option.value === '' || option.dataset.type === 'bahan') {
-                option.style.display = 'block';
-            } else {
-                option.style.display = 'none';
-            }
-        });
-        select.querySelector('option[value=""]').textContent = '-- Pilih Bahan Baku --';
+        if (select) {
+            Array.from(select.options).forEach(option => {
+                if (option.value === '' || option.dataset.type === 'bahan') {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+            const emptyOption = select.querySelector('option[value=""]');
+            if (emptyOption) emptyOption.textContent = '-- Pilih Bahan Baku --';
+        }
     } else {
         if (!isEditMode) {
-            actionInput.value = 'add_kemasan';
-            submitText.textContent = 'Tambah Kemasan';
-            formTitle.textContent = 'Bahan Baku & Kemasan';
-            formDesc.textContent = 'Tambahkan kemasan yang digunakan dalam resep';
-            submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'bg-indigo-600', 'hover:bg-indigo-700');
-            submitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            if (actionInput) actionInput.value = 'add_kemasan';
+            if (submitText) submitText.textContent = 'Tambah Kemasan';
+            if (formTitle) formTitle.textContent = 'Bahan Baku & Kemasan';
+            if (formDesc) formDesc.textContent = 'Tambahkan kemasan yang digunakan dalam resep';
+            if (submitBtn) {
+                submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'bg-indigo-600', 'hover:bg-indigo-700');
+                submitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
         }
-        label.textContent = 'Pilih Kemasan';
+        if (label) label.textContent = 'Pilih Kemasan';
 
         // Show/hide options for kemasan
-        Array.from(select.options).forEach(option => {
-            if (option.value === '' || option.dataset.type === 'kemasan') {
-                option.style.display = 'block';
-            } else {
-                option.style.display = 'none';
-            }
-        });
-        select.querySelector('option[value=""]').textContent = '-- Pilih Kemasan --';
+        if (select) {
+            Array.from(select.options).forEach(option => {
+                if (option.value === '' || option.dataset.type === 'kemasan') {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+            const emptyOption = select.querySelector('option[value=""]');
+            if (emptyOption) emptyOption.textContent = '-- Pilih Kemasan --';
+        }
     }
 
     // Restore selection if we had one (especially important for edit mode)
-    if (currentSelectValue && isEditMode) {
+    if (select && currentSelectValue && isEditMode) {
         select.value = currentSelectValue;
-    } else if (!isEditMode) {
+    } else if (select && !isEditMode) {
         select.value = '';
     }
 
     // Update tab appearance
-    document.getElementById('tab-bahan').classList.toggle('border-blue-600', tabType === 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('text-blue-600', tabType === 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('border-transparent', tabType !== 'bahan');
-    document.getElementById('tab-bahan').classList.toggle('text-gray-500', tabType !== 'bahan');
+    const tabBahan = document.getElementById('tab-bahan');
+    const tabKemasan = document.getElementById('tab-kemasan');
 
-    document.getElementById('tab-kemasan').classList.toggle('border-blue-600', tabType === 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('text-blue-600', tabType === 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('border-transparent', tabType !== 'kemasan');
-    document.getElementById('tab-kemasan').classList.toggle('text-gray-500', tabType !== 'kemasan');
+    if (tabBahan) {
+        tabBahan.classList.toggle('border-blue-600', tabType === 'bahan');
+        tabBahan.classList.toggle('text-blue-600', tabType === 'bahan');
+        tabBahan.classList.toggle('border-transparent', tabType !== 'bahan');
+        tabBahan.classList.toggle('text-gray-500', tabType !== 'bahan');
+    }
+
+    if (tabKemasan) {
+        tabKemasan.classList.toggle('border-blue-600', tabType === 'kemasan');
+        tabKemasan.classList.toggle('text-blue-600', tabType === 'kemasan');
+        tabKemasan.classList.toggle('border-transparent', tabType !== 'kemasan');
+        tabKemasan.classList.toggle('text-gray-500', tabType !== 'kemasan');
+    }
 
     // Only reset form if not in edit mode
     if (!isEditMode) {
-        document.getElementById('recipe-main-form').reset();
-        document.getElementById('recipe-action').value = tabType === 'bahan' ? 'add_bahan' : 'add_kemasan';
-        document.getElementById('recipe-edit-id').value = '';
-        document.getElementById('recipe-cancel-btn').classList.add('hidden');
+        const form = document.getElementById('recipe-main-form');
+        if (form) form.reset();
+        if (actionInput) actionInput.value = tabType === 'bahan' ? 'add_bahan' : 'add_kemasan';
+        if (editId) editId.value = '';
+        const cancelBtn = document.getElementById('recipe-cancel-btn');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
     }
 }
 
@@ -585,9 +639,9 @@ function switchManualTab(type) {
         overheadContent.classList.remove('hidden');
         action.value = 'add_manual_overhead';
         submitText.textContent = 'Tambah Overhead ke Resep';
-        submitBtn.className = 'w-full mt-6 bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200';
+        submitBtn.className = 'w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500';
 
-        // Enable overhead select and disable labor select
+        // Enable overhead select, disable labor select
         if (overheadSelect) {
             overheadSelect.required = true;
             overheadSelect.disabled = false;
@@ -597,15 +651,16 @@ function switchManualTab(type) {
             laborSelect.required = false;
             laborSelect.disabled = true;
             laborSelect.removeAttribute('name');
+            laborSelect.value = '';
         }
-    } else {
+    } else if (type === 'labor') {
         laborTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-orange-600 text-orange-600';
         laborContent.classList.remove('hidden');
         action.value = 'add_manual_labor';
         submitText.textContent = 'Tambah Tenaga Kerja ke Resep';
-        submitBtn.className = 'w-full mt-6 bg-orange-600 text-white py-3 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-200';
+        submitBtn.className = 'w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500';
 
-        // Enable labor select and disable overhead select
+        // Enable labor select, disable overhead select
         if (laborSelect) {
             laborSelect.required = true;
             laborSelect.disabled = false;
@@ -615,9 +670,9 @@ function switchManualTab(type) {
             overheadSelect.required = false;
             overheadSelect.disabled = true;
             overheadSelect.removeAttribute('name');
+            overheadSelect.value = '';
         }
     }
-
     console.log('Switched to manual tab:', type, 'Action:', action.value);
 }
 
@@ -636,7 +691,7 @@ function deleteManualOverhead(overheadManualId) {
         const productIdInput = document.createElement('input');
         productIdInput.type = 'hidden';
         productIdInput.name = 'product_id';
-        productIdInput.value = new URLSearchParams(window.location.search).get('product_id');
+        productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
 
         const overheadIdInput = document.createElement('input');
         overheadIdInput.type = 'hidden';
@@ -667,7 +722,7 @@ function deleteManualLabor(laborManualId) {
         const productIdInput = document.createElement('input');
         productIdInput.type = 'hidden';
         productIdInput.name = 'product_id';
-        productIdInput.value = new URLSearchParams(window.location.search).get('product_id');
+        productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
 
         const laborIdInput = document.createElement('input');
         laborIdInput.type = 'hidden';
@@ -681,12 +736,6 @@ function deleteManualLabor(laborManualId) {
         document.body.appendChild(form);
         form.submit();
     }
-}
-
-// Edit recipe item - Fungsi yang mengarahkan ke form edit
-function editRecipeItem(item) {
-    // Use the showEditForm function to properly edit items
-    showEditForm(item);
 }
 
 // Reset form
@@ -725,41 +774,61 @@ function resetRecipeForm() {
     if (cancelBtn) cancelBtn.classList.add('hidden');
 }
 
-// assets/js/resep_produk.js
-// Script untuk menangani form resep produk
+// Function to handle recipe deletion
+function deleteRecipe(recipeId, materialName) {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${materialName} dari resep?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/cornerbites-sia/process/simpan_resep_produk.php';
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Format input currency
-    const currencyInputs = document.querySelectorAll('input[data-currency]');
-    currencyInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            let value = this.value.replace(/[^\d]/g, '');
-            if (value) {
-                this.value = 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
-            }
-        });
-    });
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete_recipe';
 
-    // Update unit select based on raw material selection
-    const rawMaterialSelects = document.querySelectorAll('select[name="raw_material_id"]');
-    rawMaterialSelects.forEach(select => {
-        select.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const unit = selectedOption.getAttribute('data-unit');
-            const unitSelect = this.closest('form').querySelector('select[name="unit"]');
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'recipe_id';
+        idInput.value = recipeId;
 
-            if (unit && unitSelect) {
-                // Set the unit to match the raw material's unit
-                for (let option of unitSelect.options) {
-                    if (option.value === unit) {
-                        option.selected = true;
-                        break;
-                    }
-                }
-            }
-        });
-    });
-});
+        form.appendChild(actionInput);
+        form.appendChild(idInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function deleteRecipeItem(recipeId) {
+    if (confirm('Apakah Anda yakin ingin menghapus item ini dari resep?')) {
+        const productId = new URLSearchParams(window.location.search).get('product_id');
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '../process/simpan_resep_produk.php';
+
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete_recipe';
+
+        const productIdInput = document.createElement('input');
+        productIdInput.type = 'hidden';
+        productIdInput.name = 'product_id';
+        productIdInput.value = productId;
+
+        const recipeIdInput = document.createElement('input');
+        recipeIdInput.type = 'hidden';
+        recipeIdInput.name = 'recipe_id';
+        recipeIdInput.value = recipeId;
+
+        form.appendChild(actionInput);
+        form.appendChild(productIdInput);
+        form.appendChild(recipeIdInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 
 // Function untuk switch tab bahan baku & kemasan
 function switchTab(tabName, buttonElement) {
@@ -813,37 +882,53 @@ function switchOverheadTab(tabName, buttonElement) {
     buttonElement.classList.add('text-purple-600', 'border-b-2', 'border-purple-500', 'bg-white');
 }
 
-// Function to handle recipe deletion
-function deleteRecipe(recipeId, materialName) {
-    if (confirm(`Apakah Anda yakin ingin menghapus ${materialName} dari resep?`)) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/cornerbites-sia/process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_recipe';
-
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'recipe_id';
-        idInput.value = recipeId;
-
-        form.appendChild(actionInput);
-        form.appendChild(idInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
+function setSalePrice(price, margin) {
+    document.getElementById('sale_price_display').value = price.toLocaleString('id-ID');
+    document.getElementById('sale_price').value = Math.round(price);
+    
+    // Highlight the clicked margin button
+    const buttons = document.querySelectorAll('[onclick^="setSalePrice"]');
+    buttons.forEach(btn => btn.classList.remove('ring-2', 'ring-green-500'));
+    event.target.closest('div').classList.add('ring-2', 'ring-green-500');
 }
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Format input currency
+    const currencyInputs = document.querySelectorAll('input[data-currency]');
+    currencyInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            let value = this.value.replace(/[^\d]/g, '');
+            if (value) {
+                this.value = 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
+            }
+        });
+    });
+
+    // Update unit select based on raw material selection
+    const rawMaterialSelects = document.querySelectorAll('select[name="raw_material_id"]');
+    rawMaterialSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const unit = selectedOption.getAttribute('data-unit');
+            const unitSelect = this.closest('form').querySelector('select[name="unit"]');
+
+            if (unit && unitSelect) {
+                // Set the unit to match the raw material's unit
+                for (let option of unitSelect.options) {
+                    if (option.value === unit) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+            }
+        });
+    });
+
     // Restore scroll position after page load
     const savedScrollPosition = sessionStorage.getItem('resepScrollPosition');
     if (savedScrollPosition) {
         setTimeout(() => {
-
             window.scrollTo(0, parseInt(savedScrollPosition));
             sessionStorage.removeItem('resepScrollPosition');
         }, 100);
@@ -857,7 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchInputRecipe && limitSelectRecipe && sectionFilterRecipe) {
         searchInputRecipe.addEventListener('input', function() {
             clearTimeout(searchTimeoutRecipe);
-searchTimeoutRecipe = setTimeout(function() {
+            searchTimeoutRecipe = setTimeout(function() {
                 currentScrollPosition = window.pageYOffset;
                 sessionStorage.setItem('resepScrollPosition', currentScrollPosition);
                 updateRecipeResults();
@@ -899,97 +984,20 @@ searchTimeoutRecipe = setTimeout(function() {
         showCategoryTab('bahan');
     }
 
+    // Initialize form dengan tab bahan
+    switchRecipeTab('bahan');
+    
+    // Initialize manual tab dengan overhead
+    switchManualTab('overhead');
+    
+    // Format existing sale price display
+    const salePriceValue = document.getElementById('sale_price');
+    if (salePriceValue && salePriceValue.value) {
+        const salePriceDisplay = document.getElementById('sale_price_display');
+        if (salePriceDisplay) {
+            salePriceDisplay.value = parseInt(salePriceValue.value).toLocaleString('id-ID');
+        }
+    }
+
     console.log('Resep Produk page loaded');
 });
-
-function deleteRecipeItem(recipeId) {
-    if (confirm('Apakah Anda yakin ingin menghapus item ini dari resep?')) {
-        const productId = new URLSearchParams(window.location.search).get('product_id');
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_recipe';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = productId;
-
-        const recipeIdInput = document.createElement('input');
-        recipeIdInput.type = 'hidden';
-        recipeIdInput.name = 'recipe_id';
-        recipeIdInput.value = recipeId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(recipeIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function deleteManualLabor(laborManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus tenaga kerja ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_labor';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = new URLSearchParams(window.location.search).get('product_id');
-
-        const laborIdInput = document.createElement('input');
-        laborIdInput.type = 'hidden';
-        laborIdInput.name = 'labor_manual_id';
-        laborIdInput.value = laborManualId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(laborIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function deleteManualOverhead(overheadManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus overhead ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
-
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_overhead';
-
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = new URLSearchParams(window.location.search).get('product_id');
-
-        const overheadIdInput = document.createElement('input');
-        overheadIdInput.type = 'hidden';
-        overheadIdInput.name = 'overhead_manual_id';
-        overheadIdInput.value = overheadManualId;
-
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(overheadIdInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
