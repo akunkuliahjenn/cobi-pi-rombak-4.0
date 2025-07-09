@@ -631,6 +631,17 @@ function switchRecipeTab(tabType) {
         if (editId) editId.value = '';
         const cancelBtn = document.getElementById('recipe-cancel-btn');
         if (cancelBtn) cancelBtn.classList.add('hidden');
+
+        // Reset unit select state
+        const unitSelect = document.getElementById('recipe-unit');
+        if (unitSelect) {
+            unitSelect.disabled = true;
+            unitSelect.style.backgroundColor = '';
+            unitSelect.style.cursor = '';
+            unitSelect.title = '';
+            unitSelect.removeAttribute('readonly');
+            unitSelect.value = recipeUnitOptions[0];
+        }
     }
 }
 
@@ -645,123 +656,144 @@ function switchManualTab(type) {
     const submitBtn = document.getElementById('manual-submit-btn');
 
     // Reset tabs
-    overheadTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
-    laborTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+    if (overheadTab) {
+        overheadTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+    }
+    if (laborTab) {
+        laborTab.className = 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+    }
 
     // Hide all content
-    overheadContent.classList.add('hidden');
-    laborContent.classList.add('hidden');
+    if (overheadContent) overheadContent.classList.add('hidden');
+    if (laborContent) laborContent.classList.add('hidden');
 
     // Get select elements
     const overheadSelect = document.getElementById('manual-overhead-select');
     const laborSelect = document.getElementById('manual-labor-select');
 
-    // Reset dropdown values ketika switch tab
-    if (overheadSelect) overheadSelect.value = '';
-    if (laborSelect) laborSelect.value = '';
+    // Reset dropdown values ketika switch tab (TANPA mengubah DOM structure)
+    if (overheadSelect) {
+        overheadSelect.value = '';
+        overheadSelect.required = false;
+        overheadSelect.disabled = true;
+        overheadSelect.removeAttribute('name');
+    }
+    if (laborSelect) {
+        laborSelect.value = '';
+        laborSelect.required = false;
+        laborSelect.disabled = true;
+        laborSelect.removeAttribute('name');
+    }
 
     if (type === 'overhead') {
-        overheadTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-purple-600 text-purple-600';
-        overheadContent.classList.remove('hidden');
-        action.value = 'add_manual_overhead';
-        submitText.textContent = 'Tambah Overhead ke Resep';
-        submitBtn.className = 'w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500';
+        if (overheadTab) {
+            overheadTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-purple-600 text-purple-600';
+        }
+        if (overheadContent) {
+            overheadContent.classList.remove('hidden');
+        }
+        if (action) action.value = 'add_manual_overhead';
+        if (submitText) submitText.textContent = 'Tambah Overhead ke Resep';
+        if (submitBtn) {
+            submitBtn.className = 'w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500';
+        }
 
-        // Enable overhead select, disable labor select
+        // Enable overhead select only
         if (overheadSelect) {
             overheadSelect.required = true;
             overheadSelect.disabled = false;
             overheadSelect.name = 'overhead_id';
         }
-        if (laborSelect) {
-            laborSelect.required = false;
-            laborSelect.disabled = true;
-            laborSelect.removeAttribute('name');
-            laborSelect.value = '';
-        }
     } else if (type === 'labor') {
-        laborTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-orange-600 text-orange-600';
-        laborContent.classList.remove('hidden');
-        action.value = 'add_manual_labor';
-        submitText.textContent = 'Tambah Tenaga Kerja ke Resep';
-        submitBtn.className = 'w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500';
+        if (laborTab) {
+            laborTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-orange-600 text-orange-600';
+        }
+        if (laborContent) {
+            laborContent.classList.remove('hidden');
+        }
+        if (action) action.value = 'add_manual_labor';
+        if (submitText) submitText.textContent = 'Tambah Tenaga Kerja ke Resep';
+        if (submitBtn) {
+            submitBtn.className = 'w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500';
+        }
 
-        // Enable labor select, disable overhead select
+        // Enable labor select only
         if (laborSelect) {
             laborSelect.required = true;
             laborSelect.disabled = false;
             laborSelect.name = 'labor_id';
         }
-        if (overheadSelect) {
-            overheadSelect.required = false;
-            overheadSelect.disabled = true;
-            overheadSelect.removeAttribute('name');
-            overheadSelect.value = '';
-        }
     }
-    console.log('Switched to manual tab:', type, 'Action:', action.value);
 }
 
-// Delete manual overhead
+// Delete manual overhead dengan styled modal
 function deleteManualOverhead(overheadManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus overhead ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
+    showDeleteConfirmModal(
+        'Hapus Overhead',
+        'Apakah Anda yakin ingin menghapus overhead ini dari resep? Tindakan ini tidak dapat dibatalkan.',
+        () => {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '../process/simpan_resep_produk.php';
 
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_overhead';
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete_manual_overhead';
 
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
+            const productIdInput = document.createElement('input');
+            productIdInput.type = 'hidden';
+            productIdInput.name = 'product_id';
+            productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
 
-        const overheadIdInput = document.createElement('input');
-        overheadIdInput.type = 'hidden';
-        overheadIdInput.name = 'overhead_manual_id';
-        overheadIdInput.value = overheadManualId;
+            const overheadIdInput = document.createElement('input');
+            overheadIdInput.type = 'hidden';
+            overheadIdInput.name = 'overhead_manual_id';
+            overheadIdInput.value = overheadManualId;
 
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(overheadIdInput);
+            form.appendChild(actionInput);
+            form.appendChild(productIdInput);
+            form.appendChild(overheadIdInput);
 
-        document.body.appendChild(form);
-        form.submit();
-    }
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
 }
 
-// Delete manual labor
+// Delete manual labor dengan styled modal
 function deleteManualLabor(laborManualId) {
-    if (confirm('Apakah Anda yakin ingin menghapus tenaga kerja ini dari resep?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
+    showDeleteConfirmModal(
+        'Hapus Tenaga Kerja',
+        'Apakah Anda yakin ingin menghapus tenaga kerja ini dari resep? Tindakan ini tidak dapat dibatalkan.',
+        () => {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '../process/simpan_resep_produk.php';
 
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_manual_labor';
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete_manual_labor';
 
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
+            const productIdInput = document.createElement('input');
+            productIdInput.type = 'hidden';
+            productIdInput.name = 'product_id';
+            productIdInput.value = window.selectedProductId || new URLSearchParams(window.location.search).get('product_id');
 
-        const laborIdInput = document.createElement('input');
-        laborIdInput.type = 'hidden';
-        laborIdInput.name = 'labor_manual_id';
-        laborIdInput.value = laborManualId;
+            const laborIdInput = document.createElement('input');
+            laborIdInput.type = 'hidden';
+            laborIdInput.name = 'labor_manual_id';
+            laborIdInput.value = laborManualId;
 
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(laborIdInput);
+            form.appendChild(actionInput);
+            form.appendChild(productIdInput);
+            form.appendChild(laborIdInput);
 
-        document.body.appendChild(form);
-        form.submit();
-    }
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
 }
 
 // Reset form
@@ -825,35 +857,39 @@ function deleteRecipe(recipeId, materialName) {
 }
 
 function deleteRecipeItem(recipeId) {
-    if (confirm('Apakah Anda yakin ingin menghapus item ini dari resep?')) {
-        const productId = new URLSearchParams(window.location.search).get('product_id');
+    showDeleteConfirmModal(
+        'Hapus Item Resep',
+        'Apakah Anda yakin ingin menghapus item ini dari resep? Tindakan ini tidak dapat dibatalkan.',
+        () => {
+            const productId = new URLSearchParams(window.location.search).get('product_id');
 
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '../process/simpan_resep_produk.php';
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '../process/simpan_resep_produk.php';
 
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete_recipe';
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete_recipe';
 
-        const productIdInput = document.createElement('input');
-        productIdInput.type = 'hidden';
-        productIdInput.name = 'product_id';
-        productIdInput.value = productId;
+            const productIdInput = document.createElement('input');
+            productIdInput.type = 'hidden';
+            productIdInput.name = 'product_id';
+            productIdInput.value = productId;
 
-        const recipeIdInput = document.createElement('input');
-        recipeIdInput.type = 'hidden';
-        recipeIdInput.name = 'recipe_id';
-        recipeIdInput.value = recipeId;
+            const recipeIdInput = document.createElement('input');
+            recipeIdInput.type = 'hidden';
+            recipeIdInput.name = 'recipe_id';
+            recipeIdInput.value = recipeId;
 
-        form.appendChild(actionInput);
-        form.appendChild(productIdInput);
-        form.appendChild(recipeIdInput);
+            form.appendChild(actionInput);
+            form.appendChild(productIdInput);
+            form.appendChild(recipeIdInput);
 
-        document.body.appendChild(form);
-        form.submit();
-    }
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
 }
 
 // Function untuk switch tab bahan baku & kemasan
@@ -908,31 +944,82 @@ function switchOverheadTab(tabName, buttonElement) {
     buttonElement.classList.add('text-purple-600', 'border-b-2', 'border-purple-500', 'bg-white');
 }
 
+// Function untuk styled delete confirmation modal
+function showDeleteConfirmModal(title, message, onConfirm) {
+    const modalHTML = `
+        <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <p class="text-gray-700">${message}</p>
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeDeleteConfirmModal()" class="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition duration-200">
+                            Batal
+                        </button>
+                        <button type="button" onclick="confirmDelete()" class="flex-1 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition duration-200">
+                            Ya, Hapus
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Store callback function
+    window.deleteConfirmCallback = onConfirm;
+}
+
+function closeDeleteConfirmModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    if (modal) {
+        modal.remove();
+    }
+    window.deleteConfirmCallback = null;
+}
+
+function confirmDelete() {
+    if (window.deleteConfirmCallback) {
+        window.deleteConfirmCallback();
+    }
+    closeDeleteConfirmModal();
+}
+
 function setSalePrice(price, margin, element) {
     // Check if this card is already selected
     const isCurrentlySelected = element && element.classList.contains('ring-green-500');
     
-    // Remove highlight from all recommendation cards
-    const cards = document.querySelectorAll('.price-recommendation-card');
+    // Remove highlight from all recommendation cards including custom
+    const cards = document.querySelectorAll('.price-recommendation-card, .custom-margin-card');
     cards.forEach(card => {
-        card.classList.remove('ring-2', 'ring-green-500', 'bg-green-50', 'border-green-400', 'shadow-lg');
-        card.classList.add('bg-white', 'border-gray-200');
+        card.classList.remove('ring-2', 'ring-green-500', 'bg-green-50', 'border-green-400', 'shadow-lg', 'ring-blue-500', 'bg-blue-50', 'border-blue-400');
+        if (card.classList.contains('custom-margin-card')) {
+            card.classList.add('bg-white', 'border-dashed', 'border-blue-300');
+        } else {
+            card.classList.add('bg-white', 'border-gray-200');
+        }
     });
 
     if (isCurrentlySelected) {
-        // If clicking the same card again, reset to original values
-        const originalSalePrice = document.getElementById('sale_price').getAttribute('data-original-value') || '';
-        document.getElementById('sale_price_display').value = originalSalePrice ? parseInt(originalSalePrice).toLocaleString('id-ID') : '';
-        document.getElementById('sale_price').value = originalSalePrice;
+        // If clicking the same card again, reset
+        document.getElementById('sale_price_display').value = '';
+        document.getElementById('sale_price').value = '';
         
         // Show feedback message
         showTemporaryMessage('Pilihan margin dibatalkan', 'info');
     } else {
-        // Store original value if not already stored
-        if (!document.getElementById('sale_price').hasAttribute('data-original-value')) {
-            document.getElementById('sale_price').setAttribute('data-original-value', document.getElementById('sale_price').value);
-        }
-        
         // Set new price
         document.getElementById('sale_price_display').value = Math.round(price).toLocaleString('id-ID');
         document.getElementById('sale_price').value = Math.round(price);
@@ -946,6 +1033,141 @@ function setSalePrice(price, margin, element) {
         // Show feedback message
         showTemporaryMessage(`Harga jual diset ke Rp ${Math.round(price).toLocaleString('id-ID')} (margin ${margin}%)`, 'success');
     }
+}
+
+// Function untuk show custom margin modal
+function showCustomMarginModal() {
+    const hppPerUnit = parseFloat(document.getElementById('hpp-per-unit-value').textContent.replace(/[^\d]/g, ''));
+    
+    if (isNaN(hppPerUnit) || hppPerUnit <= 0) {
+        showTemporaryMessage('HPP belum tersedia untuk kalkulasi custom margin', 'warning');
+        return;
+    }
+    
+    const modalHTML = `
+        <div id="customMarginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Custom Margin</h3>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                            <div class="text-sm text-gray-600 mb-2">HPP per unit saat ini:</div>
+                            <div class="text-lg font-bold text-gray-900">Rp ${hppPerUnit.toLocaleString('id-ID')}</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="custom-margin-modal-input" class="block text-sm font-medium text-gray-700 mb-2">Margin yang diinginkan (%)</label>
+                            <input type="number" id="custom-margin-modal-input" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: 35" min="1" max="100" step="0.1" oninput="updateCustomMarginPreview()">
+                        </div>
+                        
+                        <div id="margin-preview" class="bg-blue-50 border border-blue-200 rounded-lg p-3 hidden">
+                            <div class="text-sm text-blue-800 mb-1">Kalkulasi:</div>
+                            <div class="text-xs text-blue-700 mb-2" id="calculation-formula"></div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-blue-800">Harga jual:</span>
+                                <span class="font-bold text-blue-900" id="calculated-price"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-blue-800">Profit per unit:</span>
+                                <span class="font-bold text-green-600" id="calculated-profit"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeCustomMarginModal()" class="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition duration-200">
+                            Batal
+                        </button>
+                        <button type="button" onclick="applyCustomMarginFromModal()" class="flex-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition duration-200" disabled id="apply-custom-margin-btn">
+                            Terapkan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function closeCustomMarginModal() {
+    const modal = document.getElementById('customMarginModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function updateCustomMarginPreview() {
+    const marginInput = document.getElementById('custom-margin-modal-input');
+    const preview = document.getElementById('margin-preview');
+    const applyBtn = document.getElementById('apply-custom-margin-btn');
+    const hppPerUnit = parseFloat(document.getElementById('hpp-per-unit-value').textContent.replace(/[^\d]/g, ''));
+    
+    const margin = parseFloat(marginInput.value);
+    
+    if (isNaN(margin) || margin <= 0 || margin >= 100) {
+        preview.classList.add('hidden');
+        applyBtn.disabled = true;
+        return;
+    }
+    
+    const recommendedPrice = hppPerUnit / (1 - (margin/100));
+    const profit = recommendedPrice - hppPerUnit;
+    
+    document.getElementById('calculation-formula').textContent = `HPP ÷ (1 - ${margin}%) = ${hppPerUnit.toLocaleString('id-ID')} ÷ ${(1 - margin/100).toFixed(3)} = ${Math.round(recommendedPrice).toLocaleString('id-ID')}`;
+    document.getElementById('calculated-price').textContent = `Rp ${Math.round(recommendedPrice).toLocaleString('id-ID')}`;
+    document.getElementById('calculated-profit').textContent = `Rp ${Math.round(profit).toLocaleString('id-ID')}`;
+    
+    preview.classList.remove('hidden');
+    applyBtn.disabled = false;
+}
+
+function applyCustomMarginFromModal() {
+    const marginInput = document.getElementById('custom-margin-modal-input');
+    const margin = parseFloat(marginInput.value);
+    const hppPerUnit = parseFloat(document.getElementById('hpp-per-unit-value').textContent.replace(/[^\d]/g, ''));
+    
+    if (isNaN(margin) || margin <= 0) {
+        showTemporaryMessage('Masukkan nilai margin yang valid', 'warning');
+        return;
+    }
+    
+    const recommendedPrice = hppPerUnit / (1 - (margin/100));
+    
+    // Remove highlight from all recommendation cards including custom
+    const cards = document.querySelectorAll('.price-recommendation-card, .custom-margin-card');
+    cards.forEach(card => {
+        card.classList.remove('ring-2', 'ring-green-500', 'bg-green-50', 'border-green-400', 'shadow-lg', 'ring-blue-500', 'bg-blue-50', 'border-blue-400');
+        if (card.classList.contains('custom-margin-card')) {
+            card.classList.add('bg-white', 'border-dashed', 'border-blue-300');
+        } else {
+            card.classList.add('bg-white', 'border-gray-200');
+        }
+    });
+    
+    // Highlight custom margin card
+    const customCard = document.querySelector('.custom-margin-card');
+    if (customCard) {
+        customCard.classList.remove('bg-white', 'border-dashed', 'border-blue-300');
+        customCard.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'border-blue-400', 'shadow-lg');
+    }
+    
+    // Set new price
+    document.getElementById('sale_price_display').value = Math.round(recommendedPrice).toLocaleString('id-ID');
+    document.getElementById('sale_price').value = Math.round(recommendedPrice);
+    
+    closeCustomMarginModal();
+    
+    // Show feedback message
+    showTemporaryMessage(`Harga jual diset ke Rp ${Math.round(recommendedPrice).toLocaleString('id-ID')} (custom margin ${margin}%)`, 'success');
 }
 
 // Fungsi konfirmasi update produk
@@ -1075,8 +1297,71 @@ function showTemporaryMessage(message, type = 'info') {
     }, 3000);
 }
 
+// Reset manual form after submission
+function resetManualForm() {
+    const form = document.getElementById('manual-form');
+    const overheadSelect = document.getElementById('manual-overhead-select');
+    const laborSelect = document.getElementById('manual-labor-select');
+
+    if (form) form.reset();
+    if (overheadSelect) overheadSelect.value = '';
+    if (laborSelect) laborSelect.value = '';
+
+    // Reset to overhead tab
+    switchManualTab('overhead');
+}
+
+// Add CSS untuk memastikan container stability
+function addContainerStabilityCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .container-grid {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 2rem !important;
+            align-items: start !important;
+        }
+        
+        .form-container {
+            position: relative !important;
+            min-height: 500px !important;
+            max-height: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        
+        .manual-form-content {
+            flex: 1 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+        }
+        
+        @media (max-width: 1024px) {
+            .container-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        
+        /* Fix untuk dropdown yang tidak mempengaruhi layout */
+        .manual-content select {
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Prevent layout shift */
+        .form-section {
+            overflow: visible !important;
+            contain: layout !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Add stability CSS first
+    addContainerStabilityCSS();
     // Format input currency
     const currencyInputs = document.querySelectorAll('input[data-currency]');
     currencyInputs.forEach(input => {
@@ -1101,6 +1386,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (recipeSelect) {
         recipeSelect.addEventListener('change', function() {
             updateUnitFromSelection(this);
+        });
+    }
+
+    // Add form submission handlers to reset forms after successful submission
+    const manualForm = document.getElementById('manual-form');
+    if (manualForm) {
+        manualForm.addEventListener('submit', function() {
+            // Reset form akan dilakukan setelah redirect dari server
+            setTimeout(() => {
+                if (window.location.href.includes('product_id=')) {
+                    resetManualForm();
+                }
+            }, 100);
         });
     }
 
@@ -1225,7 +1523,25 @@ document.addEventListener('DOMContentLoaded', function() {
 		}
 	}
 
-    console.log('Resep Produk page loaded');
+    // Apply container stability classes
+    const containerGrid = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2.gap-8.mb-8');
+    if (containerGrid) {
+        containerGrid.classList.add('container-grid');
+    }
+    
+    const formContainers = containerGrid?.querySelectorAll('.bg-white.rounded-xl.shadow-lg');
+    if (formContainers) {
+        formContainers.forEach(container => {
+            container.classList.add('form-container');
+        });
+    }
+    
+    const manualFormContent = document.querySelector('#manual-form');
+    if (manualFormContent) {
+        manualFormContent.classList.add('manual-form-content');
+    }
+
+    console.log('Resep Produk page loaded with container stability fixes');
 });
 
 // Function global untuk update unit dari selection (dipanggil dari PHP)
@@ -1261,4 +1577,3 @@ function updateUnitFromSelection(selectElement) {
     }
 }
 
-// This JavaScript file was updated to modify the tab navigation in the breakdown section, ensuring a more consistent and visually appealing layout.

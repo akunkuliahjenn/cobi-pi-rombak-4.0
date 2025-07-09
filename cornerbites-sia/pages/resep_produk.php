@@ -399,14 +399,14 @@ try {
                                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                                 <span class="text-gray-500 text-sm font-medium">Rp</span>
                                             </div>
-                                            <input type="text" id="sale_price_display" class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="Masukkan harga jual"  value="<?php echo $selectedProduct['sale_price'] ? number_format($selectedProduct['sale_price'], 0, ',', '.') : ''; ?>" required>
+                                            <input type="text" id="sale_price_display" class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed" placeholder="Pilih dari rekomendasi margin" value="<?php echo $selectedProduct['sale_price'] ? number_format($selectedProduct['sale_price'], 0, ',', '.') : ''; ?>" readonly>
                                             <input type="hidden" id="sale_price" name="sale_price" value="<?php echo htmlspecialchars($selectedProduct['sale_price'] ?? 0); ?>" required>
                                         </div>
-                                        <p class="text-xs text-gray-500 mt-2 flex items-center">
+                                        <p class="text-xs text-blue-600 mt-2 flex items-center">
                                             <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 000 16zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                                             </svg>
-                                            Harga jual berdasarkan analisis HPP
+                                            Harga otomatis berdasarkan margin yang dipilih di bawah
                                         </p>
                                     </div>
                                 </div>
@@ -445,7 +445,7 @@ try {
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                                     <?php 
                                     $margins = [20, 30, 40, 50];
                                     foreach ($margins as $margin): 
@@ -459,6 +459,19 @@ try {
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
+                                    
+                                    <!-- Custom Margin Card -->
+                                    <div class="custom-margin-card bg-white rounded-lg p-4 border border-dashed border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer" onclick="showCustomMarginModal()">
+                                        <div class="text-center">
+                                            <div class="text-sm font-medium text-blue-600 mb-1">Custom</div>
+                                            <div class="text-lg font-bold text-blue-600">
+                                                <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="text-xs text-blue-500 mt-1">Tentukan sendiri</div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Analisis Harga Saat Ini-->
@@ -535,7 +548,7 @@ try {
                                         </div>
                                         <div>
                                             <h3 class="text-xs font-bold text-indigo-800 mb-1">HPP per Unit</h3>
-                                            <p class="text-lg font-bold text-indigo-900">Rp <?php echo number_format($hppCalculation['hpp_per_unit'], 0, ',', '.'); ?></p>
+                                            <p class="text-lg font-bold text-indigo-900">Rp <span id="hpp-per-unit-value"><?php echo number_format($hppCalculation['hpp_per_unit'], 0, ',', '.'); ?></span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -717,37 +730,36 @@ try {
                                         <span class="text-sm text-gray-500">Hanya yang dipilih untuk produk ini</span>
                                     </div>
                                     <?php if (!empty($hppCalculation['overhead_details'])): ?>
-                                        <div class="space-y-3">
-                                            <?php foreach ($hppCalculation['overhead_details'] as $detail): ?>
-                                                <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                                    <div class="flex-1">
-                                                        <span class="font-medium text-gray-900"><?php echo htmlspecialchars($detail['name']); ?></span>
-                                                        <?php if ($detail['description']): ?>
-                                                            <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($detail['description']); ?></p>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <div class="flex-1 text-center">
-                                                        <span class="text-sm text-gray-600">
-                                                            <?php echo ucfirst(str_replace('_', ' ', $detail['allocation_method'])); ?>: 
-                                                            <?php echo number_format($detail['amount'], 0, ',', '.'); ?>
-                                                            <?php echo $detail['allocation_method'] == 'percentage' ? '%' : ($detail['allocation_method'] == 'per_hour' ? '/jam' : '/unit'); ?>
-                                                        </span>
-                                                    </div>
-                                                    <div class="flex-1 text-right flex items-center justify-end space-x-4">
-                                                        <span class="font-semibold text-gray-900 mr-4">Rp <?php echo number_format($detail['cost_per_item'], 0, ',', '.'); ?></span>
-                                                        <div class="flex items-center">
-                                                            <button onclick="deleteManualOverhead(<?php echo $detail['manual_id'] ?? 0; ?>)" class="px-2 py-1 text-xs font-medium text-red-600 bg-red-100 border border-red-300 rounded hover:bg-red-200 hover:border-red-400 transition-colors duration-200">
-                                                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                <div class="space-y-3">
+                                    <?php foreach ($hppCalculation['overhead_details'] as $detail): ?>
+                                        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                            <div class="flex-1">
+                                                <span class="font-medium text-gray-900"><?php echo htmlspecialchars($detail['name']); ?></span>
+                                                <?php if ($detail['description']): ?>
+                                                    <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($detail['description']); ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="flex-1 text-center">
+                                                <span class="text-sm text-gray-600">
+                                                    <?php echo ucfirst(str_replace('_', ' ', $detail['allocation_method'])); ?>: 
+                                                    <?php echo number_format($detail['amount'], 0, ',', '.'); ?>
+                                                    <?php echo $detail['allocation_method'] == 'percentage' ? '%' : ($detail['allocation_method'] == 'per_hour' ? '/jam' : '/unit'); ?>
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 text-right flex items-center justify-end space-x-4">
+                                                <span class="font-semibold text-gray-900 mr-4">Rp <?php echo number_format($detail['cost_per_item'], 0, ',', '.'); ?></span>
+                                                <div class="flex items-center">
+                                                    <button onclick="deleteManualOverhead(<?php echo $detail['manual_id'] ?? 0; ?>)" class="px-2 py-1 ...">
+                                                        <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                         </svg>
                                                         Hapus
                                                     </button>
-                                                        </div>
-                                                    </div>
                                                 </div>
                                             </div>
-                                        <?php endforeach; ?>
-                                    </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
                                     <?php else: ?>
                                         <div class="text-center py-8">
                                             <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,9 +783,9 @@ try {
                     </div>
 
                     <!-- Container Section untuk Input Items -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                         <!-- Container 1: Bahan Baku & Kemasan (Gabungan dengan Mode Edit) -->
-                        <div class="bg-white rounded-xl shadowlg border border-gray-100 p-6">
+                        <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 flex flex-col min-h-[500px]">
                             <div class="flex items-center mb-6">
                                 <div class="p-2 bg-blue-100 rounded-lg mr-3">
                                     <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -879,7 +891,7 @@ try {
                         </div>
 
                         <!-- Container 2: Input Manual Overhead & Tenaga Kerja -->
-                        <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                        <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 flex flex-col min-h-[500px]">
                             <div class="flex items-center mb-6">
                                 <div class="p-2 bg-purple-100 rounded-lg mr-3">
                                     <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -905,109 +917,114 @@ try {
                             </div>
 
                             <!-- Universal Form untuk Manual Input -->
-                            <form action="../process/simpan_resep_produk.php" method="POST" id="manual-form">
-                                <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($selectedProductId); ?>">
-                                <input type="hidden" name="action" value="add_manual_overhead" id="manual-action">
+                            <div class="flex-1 flex flex-col">
+                                <form action="../process/simpan_resep_produk.php" method="POST" id="manual-form" class="flex-1">
+                                    <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($selectedProductId); ?>">
+                                    <input type="hidden" name="action" value="add_manual_overhead" id="manual-action">
 
-                                <!-- Content untuk Overhead -->
-                                <div id="manual-content-overhead" class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Overhead yang Akan Ditambahkan</label>
-                                        <select name="overhead_id" id="manual-overhead-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                            <option value="">-- Pilih Overhead --</option>
-                                            <?php
-                                            try {
-                                                // Ambil overhead yang belum dipilih untuk produk ini
-                                                $stmtAvailableOverhead = $conn->prepare("
-                                                    SELECT oc.id, oc.name, oc.description, oc.allocation_method, oc.amount 
-                                                    FROM overhead_costs oc 
-                                                    WHERE oc.is_active = 1 
-                                                    AND oc.id NOT IN (
-                                                        SELECT pom.overhead_id 
-                                                        FROM product_overhead_manual pom 
-                                                        WHERE pom.product_id = ?
-                                                    )
-                                                    ORDER BY oc.name ASC
-                                                ");
-                                                $stmtAvailableOverhead->execute([$selectedProductId]);
-                                                $availableOverheads = $stmtAvailableOverhead->fetchAll(PDO::FETCH_ASSOC);
+                                    <!-- Content untuk Overhead -->
+                                    <div id="manual-content-overhead" class="space-y-4 flex-1 flex flex-col justify-between">
+                                        <div class="flex-1">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Overhead yang Akan Ditambahkan</label>
+                                            <select name="overhead_id" id="manual-overhead-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="">-- Pilih Overhead --</option>
+                                                <?php
+                                try {
+                                    // Ambil overhead yang belum dipilih untuk produk ini
+                                    $stmtAvailableOverhead = $conn->prepare("
+                                        SELECT oc.id, oc.name, oc.description, oc.allocation_method, oc.amount 
+                                        FROM overhead_costs oc 
+                                        WHERE oc.is_active = 1 
+                                        AND oc.id NOT IN (
+                                            SELECT COALESCE(pom.overhead_id, 0)
+                                            FROM product_overhead_manual pom 
+                                            WHERE pom.product_id = ?
+                                        )
+                                        ORDER BY oc.name ASC
+                                    ");
+                                    $stmtAvailableOverhead->execute([$selectedProductId]);
+                                    $availableOverheads = $stmtAvailableOverhead->fetchAll(PDO::FETCH_ASSOC);
 
-                                                foreach ($availableOverheads as $overhead):
-                                            ?>
-                                                <option value="<?php echo htmlspecialchars($overhead['id']); ?>" 
-                                                        data-method="<?php echo htmlspecialchars($overhead['allocation_method']); ?>"
-                                                        data-amount="<?php echo htmlspecialchars($overhead['amount']); ?>">
-                                                    <?php echo htmlspecialchars($overhead['name']); ?>
-                                                    <?php if ($overhead['description']): ?>
-                                                        - <?php echo htmlspecialchars($overhead['description']); ?>
-                                                    <?php endif; ?>
-                                                </option>
-                                            <?php 
-                                                endforeach;
-                                            } catch (PDOException $e) {
-                                                echo '<option disabled>Error loading overhead data</option>';
-                                            }
-                                            ?>
-                                        </select>
-                                        <p class="text-xs text-gray-500 mt-2">Pilih item overhead yang akan ditambahkan ke resep produk ini</p>
+                                    foreach ($availableOverheads as $overhead):
+                                ?>
+                                    <option value="<?php echo htmlspecialchars($overhead['id']); ?>" 
+                                            data-method="<?php echo htmlspecialchars($overhead['allocation_method']); ?>"
+                                            data-amount="<?php echo htmlspecialchars($overhead['amount']); ?>">
+                                        <?php echo htmlspecialchars($overhead['name']); ?>
+                                        <?php if ($overhead['description']): ?>
+                                            - <?php echo htmlspecialchars($overhead['description']); ?>
+                                        <?php endif; ?>
+                                    </option>
+                                <?php 
+                                    endforeach;
+                                } catch (PDOException $e) {
+                                    echo '<option disabled>Error loading overhead data</option>';
+                                }
+                                ?>
+                                            </select>
+                                            <p class="text-xs text-gray-500 mt-2">Pilih item overhead yang akan ditambahkan ke resep produk ini</p>
+                                        </div>
+
+                                        <div class="mt-auto">
+                                            <button type="submit" id="manual-submit-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            <span id="manual-submit-text">Tambah Overhead ke Resep</span>
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <button type="submit" id="manual-submit-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                        <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                        </svg>
-                                        <span id="manual-submit-text">Tambah Overhead ke Resep</span>
-                                    </button>
-                                </div>
+                                    <!-- Content untuk Tenaga Kerja -->
+                                    <div id="manual-content-labor" class="space-y-4 hidden flex-1 flex flex-col justify-between">
+                                        <div class="flex-1">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Posisi Tenaga Kerja</label>
+                                            <select name="labor_id" id="manual-labor-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                                <option value="">-- Pilih Posisi --</option>
+                                                <?php
+                                try {
+                                    // Ambil labor yang belum dipilih untuk produk ini
+                                    $stmtAvailableLabor = $conn->prepare("
+                                        SELECT lc.id, lc.position_name, lc.hourly_rate 
+                                        FROM labor_costs lc 
+                                        WHERE lc.is_active = 1 
+                                        AND lc.id NOT IN (
+                                            SELECT COALESCE(plm.labor_id, 0)
+                                            FROM product_labor_manual plm 
+                                            WHERE plm.product_id = ?
+                                        )
+                                        ORDER BY lc.position_name ASC
+                                    ");
+                                    $stmtAvailableLabor->execute([$selectedProductId]);
+                                    $availableLabors = $stmtAvailableLabor->fetchAll(PDO::FETCH_ASSOC);
 
-                                <!-- Content untuk Tenaga Kerja -->
-                                <div id="manual-content-labor" class="space-y-4 hidden">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Posisi Tenaga Kerja</label>
-                                        <select name="labor_id" id="manual-labor-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500">
-                                            <option value="">-- Pilih Posisi --</option>
-                                            <?php
-                                            try {
-                                                // Ambil labor yang belum dipilih untuk produk ini
-                                                $stmtAvailableLabor = $conn->prepare("
-                                                    SELECT lc.id, lc.position_name, lc.hourly_rate 
-                                                    FROM labor_costs lc 
-                                                    WHERE lc.is_active = 1 
-                                                    AND lc.id NOT IN (
-                                                        SELECT plm.labor_id 
-                                                        FROM product_labor_manual plm 
-                                                        WHERE plm.product_id = ?
-                                                    )
-                                                    ORDER BY lc.position_name ASC
-                                                ");
-                                                $stmtAvailableLabor->execute([$selectedProductId]);
-                                                $availableLabors = $stmtAvailableLabor->fetchAll(PDO::FETCH_ASSOC);
+                                    foreach ($availableLabors as $labor):
+                                ?>
+                                    <option value="<?php echo htmlspecialchars($labor['id']); ?>" 
+                                            data-rate="<?php echo htmlspecialchars($labor['hourly_rate']); ?>">
+                                        <?php echo htmlspecialchars($labor['position_name']); ?> 
+                                        (Rp <?php echo number_format($labor['hourly_rate'], 0, ',', '.'); ?>/jam)
+                                    </option>
+                                <?php 
+                                    endforeach;
+                                } catch (PDOException $e) {
+                                    echo '<option disabled>Error loading labor data</option>';
+                                }
+                                ?>
+                                            </select>
+                                            <p class="text-xs text-gray-500 mt-2">Sistem akan menggunakan nilai default dari pengaturan overhead & tenaga kerja</p>
+                                        </div>
 
-                                                foreach ($availableLabors as $labor):
-                                            ?>
-                                                <option value="<?php echo htmlspecialchars($labor['id']); ?>" 
-                                                        data-rate="<?php echo htmlspecialchars($labor['hourly_rate']); ?>">
-                                                    <?php echo htmlspecialchars($labor['position_name']); ?> 
-                                                    (Rp <?php echo number_format($labor['hourly_rate'], 0, ',', '.'); ?>/jam)
-                                                </option>
-                                            <?php 
-                                                endforeach;
-                                            } catch (PDOException $e) {
-                                                echo '<option disabled>Error loading labor data</option>';
-                                            }
-                                            ?>
-                                        </select>
-                                        <p class="text-xs text-gray-500 mt-2">Sistem akan menggunakan nilai default dari pengaturan overhead & tenaga kerja</p>
+                                        <div class="mt-auto">
+                                            <button type="submit" class="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                            <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            Tambah Tenaga Kerja ke Resep
+                                        </button>
                                     </div>
-
-                                    <button type="submit" class="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                                        <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                        </svg>
-                                        Tambah Tenaga Kerja ke Resep
-                                    </button>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
 
                             <!-- Catatan Penting -->
                             <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
