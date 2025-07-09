@@ -367,9 +367,9 @@ function showBreakdownTab(tabName) {
     document.getElementById('content-overhead').classList.add('hidden');
 
     // Reset semua tab button
-    document.getElementById('tab-bahan_baku').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
-    document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
-    document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
+    document.getElementById('tab-bahan_baku').className = 'flex-1 px-4 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
+    document.getElementById('tab-tenaga_kerja').className = 'flex-1 px-4 py-4 text-sm font-medium text-gray-500 hover:text-gray-700';
+    document.getElementById('tab-overhead').className = 'flex-1 px-4 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-tr-lg';
 
     // Reset badges
     document.getElementById('badge-bahan_baku').className = 'bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full';
@@ -381,13 +381,13 @@ function showBreakdownTab(tabName) {
 
     // Set active tab
     if (tabName === 'bahan_baku') {
-        document.getElementById('tab-bahan_baku').className = 'px-6 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50';
+        document.getElementById('tab-bahan_baku').className = 'flex-1 px-4 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50 rounded-tl-lg';
         document.getElementById('badge-bahan_baku').className = 'bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full';
     } else if (tabName === 'tenaga_kerja') {
-        document.getElementById('tab-tenaga_kerja').className = 'px-6 py-4 text-sm font-medium text-orange-600 border-b-2 border-orange-600 bg-orange-50';
+        document.getElementById('tab-tenaga_kerja').className = 'flex-1 px-4 py-4 text-sm font-medium text-orange-600 border-b-2 border-orange-600 bg-orange-50';
         document.getElementById('badge-tenaga_kerja').className = 'bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full';
     } else if (tabName === 'overhead') {
-        document.getElementById('tab-overhead').className = 'px-6 py-4 text-sm font-medium text-purple-600 border-b-2 border-purple-600 bg-purple-50';
+        document.getElementById('tab-overhead').className = 'flex-1 px-4 py-4 text-sm font-medium text-purple-600 border-b-2 border-purple-600 bg-purple-50 rounded-tr-lg';
         document.getElementById('badge-overhead').className = 'bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full';
     }
 }
@@ -515,6 +515,7 @@ function switchRecipeTab(tabType) {
     const editId = document.getElementById('recipe-edit-id');
     const currentSelectValue = select ? select.value : '';
     const isEditMode = editId && editId.value !== '';
+    const unitSelect = document.getElementById('recipe-unit');
 
     // Update form elements
     const actionInput = document.getElementById('recipe-action');
@@ -576,11 +577,28 @@ function switchRecipeTab(tabType) {
         }
     }
 
-    // Restore selection if we had one (especially important for edit mode)
-    if (select && currentSelectValue && isEditMode) {
-        select.value = currentSelectValue;
-    } else if (select && !isEditMode) {
+    // Reset dropdown jika tidak dalam edit mode atau jika pilihan sebelumnya tidak sesuai dengan tab yang aktif
+    if (select && !isEditMode) {
         select.value = '';
+        // Reset unit select juga
+        if (unitSelect) {
+            unitSelect.disabled = true;
+            unitSelect.value = recipeUnitOptions[0];
+        }
+    } else if (select && isEditMode && currentSelectValue) {
+        // Dalam edit mode, pastikan pilihan masih valid untuk tab yang aktif
+        const selectedOption = select.querySelector(`option[value="${currentSelectValue}"]`);
+        if (selectedOption && selectedOption.dataset.type === tabType) {
+            select.value = currentSelectValue;
+            // Update unit untuk edit mode
+            updateUnitFromSelection(select);
+        } else {
+            select.value = '';
+            if (unitSelect) {
+                unitSelect.disabled = true;
+                unitSelect.value = recipeUnitOptions[0];
+            }
+        }
     }
 
     // Update tab appearance
@@ -604,7 +622,11 @@ function switchRecipeTab(tabType) {
     // Only reset form if not in edit mode
     if (!isEditMode) {
         const form = document.getElementById('recipe-main-form');
-        if (form) form.reset();
+        if (form) {
+            // Reset hanya quantity, biarkan yang lain diatur oleh logic di atas
+            const quantityInput = document.getElementById('recipe-quantity');
+            if (quantityInput) quantityInput.value = '';
+        }
         if (actionInput) actionInput.value = tabType === 'bahan' ? 'add_bahan' : 'add_kemasan';
         if (editId) editId.value = '';
         const cancelBtn = document.getElementById('recipe-cancel-btn');
@@ -633,6 +655,10 @@ function switchManualTab(type) {
     // Get select elements
     const overheadSelect = document.getElementById('manual-overhead-select');
     const laborSelect = document.getElementById('manual-labor-select');
+
+    // Reset dropdown values ketika switch tab
+    if (overheadSelect) overheadSelect.value = '';
+    if (laborSelect) laborSelect.value = '';
 
     if (type === 'overhead') {
         overheadTab.className = 'py-2 px-1 border-b-2 font-medium text-sm border-purple-600 text-purple-600';
@@ -882,14 +908,171 @@ function switchOverheadTab(tabName, buttonElement) {
     buttonElement.classList.add('text-purple-600', 'border-b-2', 'border-purple-500', 'bg-white');
 }
 
-function setSalePrice(price, margin) {
-    document.getElementById('sale_price_display').value = price.toLocaleString('id-ID');
-    document.getElementById('sale_price').value = Math.round(price);
+function setSalePrice(price, margin, element) {
+    // Check if this card is already selected
+    const isCurrentlySelected = element && element.classList.contains('ring-green-500');
     
-    // Highlight the clicked margin button
-    const buttons = document.querySelectorAll('[onclick^="setSalePrice"]');
-    buttons.forEach(btn => btn.classList.remove('ring-2', 'ring-green-500'));
-    event.target.closest('div').classList.add('ring-2', 'ring-green-500');
+    // Remove highlight from all recommendation cards
+    const cards = document.querySelectorAll('.price-recommendation-card');
+    cards.forEach(card => {
+        card.classList.remove('ring-2', 'ring-green-500', 'bg-green-50', 'border-green-400', 'shadow-lg');
+        card.classList.add('bg-white', 'border-gray-200');
+    });
+
+    if (isCurrentlySelected) {
+        // If clicking the same card again, reset to original values
+        const originalSalePrice = document.getElementById('sale_price').getAttribute('data-original-value') || '';
+        document.getElementById('sale_price_display').value = originalSalePrice ? parseInt(originalSalePrice).toLocaleString('id-ID') : '';
+        document.getElementById('sale_price').value = originalSalePrice;
+        
+        // Show feedback message
+        showTemporaryMessage('Pilihan margin dibatalkan', 'info');
+    } else {
+        // Store original value if not already stored
+        if (!document.getElementById('sale_price').hasAttribute('data-original-value')) {
+            document.getElementById('sale_price').setAttribute('data-original-value', document.getElementById('sale_price').value);
+        }
+        
+        // Set new price
+        document.getElementById('sale_price_display').value = Math.round(price).toLocaleString('id-ID');
+        document.getElementById('sale_price').value = Math.round(price);
+
+        // Add highlight to clicked card
+        if (element) {
+            element.classList.remove('bg-white', 'border-gray-200');
+            element.classList.add('ring-2', 'ring-green-500', 'bg-green-50', 'border-green-400', 'shadow-lg');
+        }
+        
+        // Show feedback message
+        showTemporaryMessage(`Harga jual diset ke Rp ${Math.round(price).toLocaleString('id-ID')} (margin ${margin}%)`, 'success');
+    }
+}
+
+// Fungsi konfirmasi update produk
+function confirmUpdateProduct() {
+    // Get form data untuk validasi
+    const productionYield = document.getElementById('production_yield').value;
+    const productionTime = document.getElementById('production_time_hours').value;
+    const salePrice = document.getElementById('sale_price').value;
+
+    if (!productionYield || !productionTime || !salePrice) {
+        alert('Mohon lengkapi semua field sebelum menyimpan.');
+        return;
+    }
+
+    // Format sale price untuk display
+    const formattedPrice = parseInt(salePrice).toLocaleString('id-ID');
+
+    // Show confirmation modal
+    const confirmHTML = `
+        <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Konfirmasi Update Info Produk</h3>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <p class="text-gray-700 mb-4">Apakah Anda yakin ingin menyimpan perubahan berikut?</p>
+                        <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Hasil Produksi:</span>
+                                <span class="text-sm font-medium">${productionYield} unit</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Waktu Produksi:</span>
+                                <span class="text-sm font-medium">${productionTime} jam</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Harga Jual:</span>
+                                <span class="text-sm font-medium">Rp ${formattedPrice}</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p class="text-sm text-blue-700">
+                                <strong>Catatan:</strong> Perubahan ini akan mempengaruhi kalkulasi HPP dan data yang terlihat di halaman <strong>Manajemen Produk</strong>.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeConfirmModal()" class="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition duration-200">
+                            Batal
+                        </button>
+                        <button type="button" onclick="submitUpdateProduct()" class="flex-1 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition duration-200">
+                            Ya, Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', confirmHTML);
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirmModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function submitUpdateProduct() {
+    closeConfirmModal();
+    document.getElementById('update-product-form').submit();
+}
+
+// Function to show temporary feedback messages
+function showTemporaryMessage(message, type = 'info') {
+    // Remove existing temporary message if any
+    const existingMessage = document.getElementById('temporary-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.id = 'temporary-message';
+    messageDiv.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out translate-x-0`;
+    
+    // Set color based on type
+    if (type === 'success') {
+        messageDiv.classList.add('bg-green-100', 'border', 'border-green-400', 'text-green-700');
+    } else if (type === 'info') {
+        messageDiv.classList.add('bg-blue-100', 'border', 'border-blue-400', 'text-blue-700');
+    } else if (type === 'warning') {
+        messageDiv.classList.add('bg-yellow-100', 'border', 'border-yellow-400', 'text-yellow-700');
+    }
+
+    messageDiv.innerHTML = `
+        <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                ${type === 'success' ? 
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' :
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
+                }
+            </svg>
+            <span class="text-sm font-medium">${message}</span>
+        </div>
+    `;
+
+    document.body.appendChild(messageDiv);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        messageDiv.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.remove();
+            }
+        }, 300);
+    }, 3000);
 }
 
 // Initialize when DOM is loaded
@@ -909,21 +1092,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const rawMaterialSelects = document.querySelectorAll('select[name="raw_material_id"]');
     rawMaterialSelects.forEach(select => {
         select.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const unit = selectedOption.getAttribute('data-unit');
-            const unitSelect = this.closest('form').querySelector('select[name="unit"]');
-
-            if (unit && unitSelect) {
-                // Set the unit to match the raw material's unit
-                for (let option of unitSelect.options) {
-                    if (option.value === unit) {
-                        option.selected = true;
-                        break;
-                    }
-                }
-            }
+            updateUnitFromSelection(this);
         });
     });
+
+    // Add event listener untuk recipe select
+    const recipeSelect = document.getElementById('recipe-select');
+    if (recipeSelect) {
+        recipeSelect.addEventListener('change', function() {
+            updateUnitFromSelection(this);
+        });
+    }
 
     // Restore scroll position after page load
     const savedScrollPosition = sessionStorage.getItem('resepScrollPosition');
@@ -986,18 +1165,100 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize form dengan tab bahan
     switchRecipeTab('bahan');
-    
+
     // Initialize manual tab dengan overhead
     switchManualTab('overhead');
-    
+
     // Format existing sale price display
     const salePriceValue = document.getElementById('sale_price');
-    if (salePriceValue && salePriceValue.value) {
-        const salePriceDisplay = document.getElementById('sale_price_display');
-        if (salePriceDisplay) {
+    const salePriceDisplay = document.getElementById('sale_price_display');
+    
+    if (salePriceValue && salePriceDisplay) {
+        // Store original value for reset functionality
+        if (salePriceValue.value && !salePriceValue.hasAttribute('data-original-value')) {
+            salePriceValue.setAttribute('data-original-value', salePriceValue.value);
+        }
+        
+        if (salePriceValue.value) {
             salePriceDisplay.value = parseInt(salePriceValue.value).toLocaleString('id-ID');
         }
+        
+        // Add event listener untuk format input real-time
+        salePriceDisplay.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^\d]/g, '');
+            if (value) {
+                e.target.value = parseInt(value).toLocaleString('id-ID');
+                salePriceValue.value = value;
+                // Update original value when user manually inputs
+                salePriceValue.setAttribute('data-original-value', value);
+            } else {
+                e.target.value = '';
+                salePriceValue.value = '';
+                salePriceValue.removeAttribute('data-original-value');
+            }
+        });
     }
+
+	// Function to update unit select based on raw material selection
+	function updateUnitFromSelection(selectElement) {
+		const selectedOption = selectElement.options[selectElement.selectedIndex];
+		const unit = selectedOption.getAttribute('data-unit');
+		const unitSelect = selectElement.closest('form').querySelector('select[name="unit_measurement"]');
+
+		if (unit && unitSelect) {
+			// Set the unit to match the raw material's unit dan disable
+			for (let option of unitSelect.options) {
+				if (option.value === unit) {
+					option.selected = true;
+					break;
+				}
+			}
+			// Disable unit select supaya user tidak bisa mengubah
+			unitSelect.disabled = false;
+			unitSelect.style.backgroundColor = '#f3f4f6';
+			unitSelect.style.cursor = 'not-allowed';
+		} else if (unitSelect) {
+			// Jika tidak ada unit yang dipilih, enable kembali
+			unitSelect.disabled = true;
+			unitSelect.style.backgroundColor = '';
+			unitSelect.style.cursor = '';
+		}
+	}
 
     console.log('Resep Produk page loaded');
 });
+
+// Function global untuk update unit dari selection (dipanggil dari PHP)
+function updateUnitFromSelection(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const unit = selectedOption.getAttribute('data-unit');
+    const unitSelect = selectElement.closest('form').querySelector('select[name="unit_measurement"]');
+
+    if (unit && unitSelect && selectedOption.value !== '') {
+        // Set the unit to match the raw material's unit dan disable
+        for (let option of unitSelect.options) {
+            if (option.value === unit) {
+                option.selected = true;
+                break;
+            }
+        }
+        // Disable unit select supaya user tidak bisa mengubah
+        unitSelect.disabled = false;
+        unitSelect.style.backgroundColor = '#f3f4f6';
+        unitSelect.style.cursor = 'not-allowed';
+        unitSelect.title = 'Satuan otomatis sesuai dengan bahan baku yang dipilih';
+        
+        // Add readonly attribute
+        unitSelect.setAttribute('readonly', 'readonly');
+    } else if (unitSelect) {
+        // Jika tidak ada unit yang dipilih, reset
+        unitSelect.disabled = true;
+        unitSelect.style.backgroundColor = '';
+        unitSelect.style.cursor = '';
+        unitSelect.title = '';
+        unitSelect.removeAttribute('readonly');
+        unitSelect.value = recipeUnitOptions[0];
+    }
+}
+
+// This JavaScript file was updated to modify the tab navigation in the breakdown section, ensuring a more consistent and visually appealing layout.
