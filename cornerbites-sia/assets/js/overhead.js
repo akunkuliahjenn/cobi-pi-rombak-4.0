@@ -10,7 +10,7 @@ function resetOverheadForm() {
     if (form) {
         form.reset(); // Reset semua input dalam form
     }
-    
+
     document.getElementById('overhead_id_to_edit').value = '';
     document.getElementById('overhead_name').value = '';
     document.getElementById('overhead_amount').value = '';
@@ -34,7 +34,7 @@ function resetLaborForm() {
         document.getElementById('labor_position_name').value = '';
         document.getElementById('labor_hourly_rate').value = '';
     }
-    
+
     document.getElementById('labor_form_title').textContent = 'Tambah Posisi Tenaga Kerja Baru';
     document.getElementById('labor_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,6 +47,7 @@ function resetLaborForm() {
 
 // Format number function (konsisten dengan produk.js) - tanpa desimal
 function formatNumber(num) {
+    if (!num || isNaN(num)) return '';
     return new Intl.NumberFormat('id-ID', { 
         minimumFractionDigits: 0, 
         maximumFractionDigits: 0 
@@ -71,26 +72,30 @@ function formatRupiahInput(element) {
 
 // Edit overhead
 function editOverhead(overhead) {
+    // Sekarang fungsi menerima satu objek 'overhead'
     document.getElementById('overhead_id_to_edit').value = overhead.id;
     document.getElementById('overhead_name').value = overhead.name;
-
-    // Format amount value untuk editing - langsung set dengan format yang benar
-    const amountInput = document.getElementById('overhead_amount');
-    const amountValue = parseInt(overhead.amount);
-    const formattedAmount = formatNumber(amountValue);
-    amountInput.value = formattedAmount;
-
     document.getElementById('overhead_description').value = overhead.description || '';
+    
+    // Format amount untuk ditampilkan dengan benar
+    const amountInput = document.getElementById('overhead_amount');
+    amountInput.value = overhead.amount ? new Intl.NumberFormat('id-ID').format(overhead.amount) : '';
+
+    // Set metode alokasi dan estimasi pemakaian
+    document.getElementById('allocation_method').value = overhead.allocation_method || 'per_batch'; // Default ke per_batch jika null
+    document.getElementById('estimated_uses').value = overhead.estimated_uses || 1;
+
+    // Ubah tampilan tombol dan judul form
     document.getElementById('overhead_form_title').textContent = 'Edit Biaya Overhead';
     document.getElementById('overhead_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
         </svg>
         Update Overhead
     `;
     document.getElementById('overhead_cancel_edit_button').classList.remove('hidden');
 
-    // Scroll to form overhead
+    // Scroll ke form agar terlihat oleh pengguna
     document.getElementById('overhead_form_title').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -162,7 +167,7 @@ function loadLaborData(page = 1) {
 
     const searchValue = searchInput.value;
     const limitValue = limitSelect.value;
-    
+
     // Simpan current page
     currentLaborPage = page;
 
@@ -199,14 +204,21 @@ function loadLaborData(page = 1) {
         });
 }
 
-// Edit Overhead function
 function editOverhead(overhead) {
+    // Sekarang fungsi menerima satu objek 'overhead'
     document.getElementById('overhead_id_to_edit').value = overhead.id;
     document.getElementById('overhead_name').value = overhead.name;
-    document.getElementById('overhead_amount').value = numberFormat(overhead.amount);
     document.getElementById('overhead_description').value = overhead.description || '';
+    
+    // Format amount untuk ditampilkan dengan benar
+    const amountInput = document.getElementById('overhead_amount');
+    amountInput.value = overhead.amount ? new Intl.NumberFormat('id-ID').format(overhead.amount) : '';
 
-    // Update form title and button
+    // Set metode alokasi dan estimasi pemakaian
+    document.getElementById('allocation_method').value = overhead.allocation_method || 'per_batch'; // Default ke per_batch jika null
+    document.getElementById('estimated_uses').value = overhead.estimated_uses || 1;
+
+    // Ubah tampilan tombol dan judul form
     document.getElementById('overhead_form_title').textContent = 'Edit Biaya Overhead';
     document.getElementById('overhead_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,9 +226,10 @@ function editOverhead(overhead) {
         </svg>
         Update Overhead
     `;
-    document.getElementById('overhead_submit_button').classList.remove('bg-blue-600', 'hover:bg-blue-700');
-    document.getElementById('overhead_submit_button').classList.add('bg-orange-600', 'hover:bg-orange-700');
     document.getElementById('overhead_cancel_edit_button').classList.remove('hidden');
+
+    // Scroll ke form agar terlihat oleh pengguna
+    document.getElementById('overhead_form_title').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Reset Overhead form
@@ -389,7 +402,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const overheadCancelButton = document.getElementById('overhead_cancel_edit_button');
     if (overheadCancelButton) {
         overheadCancelButton.addEventListener('click', resetOverheadForm);
+
+    // Labor cancel button
+    const laborCancelButton = document.getElementById('labor_cancel_edit_button');
+    if (laborCancelButton) {
+        laborCancelButton.addEventListener('click', resetLaborForm);
     }
+}
 
     const laborCancelButton = document.getElementById('labor_cancel_edit_button');
     if (laborCancelButton) {
@@ -455,7 +474,7 @@ function loadOverheadData(page = 1) {
 
     const searchValue = searchInput.value;
     const limitValue = limitSelect.value;
-    
+
     // Simpan current page
     currentOverheadPage = page;
 
@@ -540,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return false;
                 }
                 amountInput.value = rawValue;
-                
+
                 // Simpan state pagination sebelum submit
                 localStorage.setItem('overheadPage', currentOverheadPage);
                 localStorage.setItem('overheadLimit', document.getElementById('limit-overhead-select').value);
@@ -569,7 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return false;
                 }
                 hourlyRateInput.value = rawValue;
-                
+
                 // Simpan state pagination sebelum submit
                 localStorage.setItem('laborPage', currentLaborPage);
                 localStorage.setItem('laborLimit', document.getElementById('limit-labor-select').value);
@@ -640,49 +659,80 @@ document.addEventListener('DOMContentLoaded', function() {
             loadLaborData(1);
         });
     }
-    
+
     // Restore pagination state setelah reload (misalnya setelah edit)
     if (localStorage.getItem('overheadPage')) {
         const savedPage = parseInt(localStorage.getItem('overheadPage'));
         const savedLimit = localStorage.getItem('overheadLimit');
         const savedSearch = localStorage.getItem('overheadSearch');
-        
+
         if (savedLimit && limitOverheadSelect) {
             limitOverheadSelect.value = savedLimit;
         }
         if (savedSearch && searchOverheadInput) {
             searchOverheadInput.value = savedSearch;
         }
-        
+
         setTimeout(() => {
             loadOverheadData(savedPage);
         }, 100);
-        
+
         // Clear dari localStorage
         localStorage.removeItem('overheadPage');
         localStorage.removeItem('overheadLimit');
         localStorage.removeItem('overheadSearch');
     }
-    
+
     if (localStorage.getItem('laborPage')) {
         const savedPage = parseInt(localStorage.getItem('laborPage'));
         const savedLimit = localStorage.getItem('laborLimit');
         const savedSearch = localStorage.getItem('laborSearch');
-        
+
         if (savedLimit && limitLaborSelect) {
             limitLaborSelect.value = savedLimit;
         }
         if (savedSearch && searchLaborInput) {
             searchLaborInput.value = savedSearch;
         }
-        
+
         setTimeout(() => {
             loadLaborData(savedPage);
         }, 100);
-        
+
         // Clear dari localStorage
         localStorage.removeItem('laborPage');
         localStorage.removeItem('laborLimit');
         localStorage.removeItem('laborSearch');
     }
 });
+
+function editOverhead(id, name, description, amount, method, estimatedUses) {
+    document.getElementById('overhead_id_to_edit').value = id;
+    document.getElementById('overhead_name').value = name;
+    document.getElementById('overhead_description').value = description;
+    document.getElementById('overhead_amount').value = formatNumber(amount);
+    document.getElementById('allocation_method').value = method;
+    document.getElementById('estimated_uses').value = estimatedUses || 1;
+}
+
+function resetOverheadForm() {
+    const form = document.querySelector('form[action*="simpan_overhead"][method="POST"]');
+    if (form) {
+        // Hanya reset input overhead, bukan semua form
+        document.getElementById('overhead_id_to_edit').value = '';
+        document.getElementById('overhead_name').value = '';
+        document.getElementById('overhead_description').value = '';
+        document.getElementById('overhead_amount').value = '';
+        document.getElementById('allocation_method').value = 'per_batch';
+        document.getElementById('estimated_uses').value = '1';
+    }
+
+    document.getElementById('overhead_form_title').textContent = 'Tambah Biaya Overhead Baru';
+    document.getElementById('overhead_submit_button').innerHTML = `
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Tambah Overhead
+    `;
+    document.getElementById('overhead_cancel_edit_button').classList.add('hidden');
+}

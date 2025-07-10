@@ -1,28 +1,49 @@
-
 <?php
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
-// Handle AJAX request for ranking pagination
+// Handle AJAX request for ranking pagination with search
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
     $ranking_page = isset($_GET['ranking_page']) ? max((int)$_GET['ranking_page'], 1) : 1;
-    $ranking_limit = 5;
+    $ranking_limit = isset($_GET['ranking_limit']) ? max((int)$_GET['ranking_limit'], 5) : 5;
     $ranking_offset = ($ranking_page - 1) * $ranking_limit;
+    $search_ranking = isset($_GET['search_ranking']) ? trim($_GET['search_ranking']) : '';
 
     try {
         $conn = $db;
-        
+
+        // Build search condition
+        $where_condition = "WHERE sale_price > 0 AND cost_price > 0";
+        $params = [];
+
+        if (!empty($search_ranking)) {
+            $where_condition .= " AND name LIKE :search";
+            $params[':search'] = '%' . $search_ranking . '%';
+        }
+
         // Count total products for pagination
-        $stmt = $conn->query("SELECT COUNT(*) as total FROM products WHERE sale_price > 0");
+        $count_query = "SELECT COUNT(*) as total FROM products " . $where_condition;
+        $stmt = $conn->prepare($count_query);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->execute();
         $result = $stmt->fetch();
         $total_products_ranking = $result ? ($result['total'] ?? 0) : 0;
         $total_ranking_pages = ceil($total_products_ranking / $ranking_limit);
 
         // Get ranking data
-        $stmt = $conn->prepare("SELECT name, cost_price, sale_price, (sale_price - cost_price) as profit, ((sale_price - cost_price) / sale_price * 100) as margin, 
-                              CASE WHEN sale_price > cost_price THEN 'Menguntungkan' ELSE 'Rugi' END as status 
-                              FROM products WHERE sale_price > 0 
-                              ORDER BY profit DESC LIMIT :limit OFFSET :offset");
+        $ranking_query = "SELECT name, cost_price, sale_price, stock, 
+                         (sale_price - cost_price) as profit, 
+                         ((sale_price - cost_price) / sale_price * 100) as margin, 
+                         CASE WHEN sale_price > cost_price THEN 'Menguntungkan' ELSE 'Rugi' END as status 
+                         FROM products " . $where_condition . "
+                         ORDER BY profit DESC LIMIT :limit OFFSET :offset";
+
+        $stmt = $conn->prepare($ranking_query);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
         $stmt->bindValue(':limit', $ranking_limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $ranking_offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -30,6 +51,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
 
         ob_start();
         ?>
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex items-center space-x-2">
+                <label for="ranking_limit_select" class="text-sm font-medium text-gray-700">Show:</label>
+                <select id="ranking_limit_select" onchange="updateRankingLimit(this.value)" 
+                        class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="5" <?php echo $ranking_limit == 5 ? 'selected' : ''; ?>>5</option>
+                    <option value="10" <?php echo $ranking_limit == 10 ? 'selected' : ''; ?>>10</option>
+                    <option value="25" <?php echo $ranking_limit == 25 ? 'selected' : ''; ?>>25</option>
+                    <option value="50" <?php echo $ranking_limit == 50 ? 'selected' : ''; ?>>50</option>
+                </select>
+                <span class="text-sm text-gray-700">entries</span>
+            </div>
+
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" id="search_ranking_input" 
+                       placeholder="Cari produk..." 
+                       value="<?php echo htmlspecialchars($search_ranking); ?>"
+                       onkeyup="searchRanking(this.value)"
+                       class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm">
+            </div>
+        </div>
+
         <div class="overflow-x-auto">
             <table class="min-w-full">
                 <thead>
@@ -40,6 +88,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Jual</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit per Unit</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Margin (%)</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
@@ -47,12 +96,25 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
                     <?php if (!empty($profitabilityRanking)): ?>
                         <?php foreach ($profitabilityRanking as $index => $product): ?>
                             <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo (($ranking_page - 1) * $ranking_limit) + $index + 1; ?></td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($product['name']); ?></td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">
+                                        <?php echo (($ranking_page - 1) * $ranking_limit) + $index + 1; ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium"><?php echo htmlspecialchars($product['name']); ?></td>
                                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['cost_price'], 0, ',', '.'); ?></td>
                                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['sale_price'], 0, ',', '.'); ?></td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['profit'], 0, ',', '.'); ?></td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo number_format($product['margin'], 1); ?>%</td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold <?php echo $product['profit'] >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                    Rp <?php echo number_format($product['profit'], 0, ',', '.'); ?>
+                                </td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold <?php echo $product['margin'] >= 15 ? 'text-green-600' : ($product['margin'] >= 5 ? 'text-yellow-600' : 'text-red-600'); ?>">
+                                    <?php echo number_format($product['margin'], 1); ?>%
+                                </td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?php echo $product['stock'] >= 10 ? 'bg-green-100 text-green-800' : ($product['stock'] >= 5 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'); ?>">
+                                        <?php echo number_format($product['stock']); ?>
+                                    </span>
+                                </td>
                                 <td class="px-4 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?php echo $product['status'] == 'Menguntungkan' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
                                         <?php echo $product['status']; ?>
@@ -62,7 +124,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">Belum ada data produk</td>
+                            <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                                <?php echo !empty($search_ranking) ? 'Tidak ada produk yang ditemukan dengan pencarian "' . htmlspecialchars($search_ranking) . '"' : 'Belum ada data produk dengan HPP'; ?>
+                            </td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -71,11 +135,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
 
         <!-- Pagination for Ranking -->
         <?php if ($total_ranking_pages > 1): ?>
-        <div class="mt-6 flex justify-between items-center">
+        <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="text-sm text-gray-700">
                 Menampilkan <?php echo (($ranking_page - 1) * $ranking_limit) + 1; ?> - 
                 <?php echo min($ranking_page * $ranking_limit, $total_products_ranking); ?> 
                 dari <?php echo $total_products_ranking; ?> produk
+                <?php if (!empty($search_ranking)): ?>
+                    <span class="text-blue-600">(filtered from search)</span>
+                <?php endif; ?>
             </div>
             <div class="flex space-x-2">
                 <?php if ($ranking_page > 1): ?>
@@ -110,7 +177,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking') {
         echo $content;
         exit;
     } catch (Exception $e) {
-        echo '<div class="text-center text-red-500 py-8">Error loading data</div>';
+        echo '<div class="text-center text-red-500 py-8">Error loading data: ' . htmlspecialchars($e->getMessage()) . '</div>';
         exit;
     }
 }
@@ -135,12 +202,6 @@ $lowestProfitProduct = null;
 $profitabilityRanking = [];
 $total_products_ranking = 0;
 $total_ranking_pages = 0;
-$costBreakdown = [
-    'bahan_baku' => 0,
-    'kemasan' => 0,
-    'tenaga_kerja' => 0,
-    'overhead' => 0
-];
 
 try {
     $conn = $db;
@@ -180,62 +241,69 @@ try {
     $result = $stmt->fetch();
     $totalRecipes = $result ? ($result['total'] ?? 0) : 0;
 
-    // Total Labor Positions and Cost
-    $stmt = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(hourly_rate), 0) as total_cost FROM labor_costs WHERE is_active = 1");
-    $result = $stmt->fetch();
-    $totalLaborPositions = $result ? ($result['total'] ?? 0) : 0;
-    $totalLaborCost = $result ? ($result['total_cost'] ?? 0) : 0;
+    // Total Labor Positions and Cost (semua data aktif dan non-aktif)
+    try {
+        $stmt = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(hourly_rate), 0) as total_cost FROM labor_costs");
+        $result = $stmt->fetch();
+        $totalLaborPositions = $result ? ($result['total'] ?? 0) : 0;
+        $totalLaborCost = $result ? ($result['total_cost'] ?? 0) : 0;
 
-    // Total Overhead Items and Cost
-    $stmt = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(amount), 0) as total_cost FROM overhead_costs WHERE is_active = 1");
-    $result = $stmt->fetch();
-    $totalOverheadItems = $result ? ($result['total'] ?? 0) : 0;
-    $totalOverheadCost = $result ? ($result['total_cost'] ?? 0) : 0;
+        // Debug: tampilkan hasil query
+        error_log("Labor query result: total=" . $totalLaborPositions . ", cost=" . $totalLaborCost);
+    } catch (PDOException $e) {
+        error_log("Error labor query: " . $e->getMessage());
+        $totalLaborPositions = 0;
+        $totalLaborCost = 0;
+    }
 
-    // Calculate Average HPP
+    // Total Overhead Items and Cost (semua data aktif dan non-aktif)
+    try {
+        $stmt = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(amount), 0) as total_cost FROM overhead_costs");
+        $result = $stmt->fetch();
+        $totalOverheadItems = $result ? ($result['total'] ?? 0) : 0;
+        $totalOverheadCost = $result ? ($result['total_cost'] ?? 0) : 0;
+
+        // Debug: tampilkan hasil query
+        error_log("Overhead query result: total=" . $totalOverheadItems . ", cost=" . $totalOverheadCost);
+    } catch (PDOException $e) {
+        error_log("Error overhead query: " . $e->getMessage());
+        $totalOverheadItems = 0;
+        $totalOverheadCost = 0;
+    }
+
+    // Calculate Average HPP (only products with calculated HPP)
     $stmt = $conn->query("SELECT AVG(cost_price) as avg_hpp FROM products WHERE cost_price > 0");
     $result = $stmt->fetch();
     $avgHPP = $result ? ($result['avg_hpp'] ?? 0) : 0;
 
-    // Calculate Average Margin
+    // Calculate Average Margin (only products with both cost and sale price)
     $stmt = $conn->query("SELECT AVG(((sale_price - cost_price) / sale_price) * 100) as avg_margin FROM products WHERE sale_price > 0 AND cost_price > 0");
     $result = $stmt->fetch();
     $avgMargin = $result ? ($result['avg_margin'] ?? 0) : 0;
 
     // Count Profitable Products (profit > 0)
-    $stmt = $conn->query("SELECT COUNT(*) as total FROM products WHERE sale_price > cost_price AND sale_price > 0");
+    $stmt = $conn->query("SELECT COUNT(*) as total FROM products WHERE sale_price > cost_price AND sale_price > 0 AND cost_price > 0");
     $result = $stmt->fetch();
     $profitableProducts = $result ? ($result['total'] ?? 0) : 0;
 
-    // Product with highest profit margin
-    $stmt = $conn->query("SELECT name, cost_price, sale_price, (sale_price - cost_price) as profit, ((sale_price - cost_price) / sale_price * 100) as margin FROM products WHERE sale_price > 0 ORDER BY profit DESC LIMIT 1");
-    $highestProfitProduct = $stmt->fetch();
-
-    // Product with lowest profit margin
-    $stmt = $conn->query("SELECT name, cost_price, sale_price, (sale_price - cost_price) as profit, ((sale_price - cost_price) / sale_price * 100) as margin FROM products WHERE sale_price > 0 ORDER BY profit ASC LIMIT 1");
-    $lowestProfitProduct = $stmt->fetch();
-
     // Pagination for profitability ranking
     $ranking_page = isset($_GET['ranking_page']) ? max((int)$_GET['ranking_page'], 1) : 1;
-    $ranking_limit = 5;
+    $ranking_limit = 10;
     $ranking_offset = ($ranking_page - 1) * $ranking_limit;
 
-    // Count total products for pagination
-    $stmt = $conn->query("SELECT COUNT(*) as total FROM products WHERE sale_price > 0");
+    // Count total products with HPP for pagination  
+    $stmt = $conn->query("SELECT COUNT(*) as total FROM products WHERE sale_price > 0 AND cost_price > 0");
     $result = $stmt->fetch();
     $total_products_ranking = $result ? ($result['total'] ?? 0) : 0;
     $total_ranking_pages = ceil($total_products_ranking / $ranking_limit);
 
-    // Ensure $total_ranking_pages is at least 1 if there are products
-    if ($total_products_ranking > 0 && $total_ranking_pages == 0) {
-        $total_ranking_pages = 1;
-    }
-
-    // Profitability Ranking with pagination
+    // Profitability Ranking with pagination (only products with calculated HPP)
     if ($total_products_ranking > 0) {
-        $stmt = $conn->prepare("SELECT name, cost_price, sale_price, (sale_price - cost_price) as profit, ((sale_price - cost_price) / sale_price * 100) as margin, 
+        $stmt = $conn->prepare("SELECT name, cost_price, sale_price, stock,
+                              (sale_price - cost_price) as profit, 
+                              ((sale_price - cost_price) / sale_price * 100) as margin, 
                               CASE WHEN sale_price > cost_price THEN 'Menguntungkan' ELSE 'Rugi' END as status 
-                              FROM products WHERE sale_price > 0 
+                              FROM products WHERE sale_price > 0 AND cost_price > 0
                               ORDER BY profit DESC LIMIT :limit OFFSET :offset");
         $stmt->bindValue(':limit', $ranking_limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $ranking_offset, PDO::PARAM_INT);
@@ -243,28 +311,8 @@ try {
         $profitabilityRanking = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Cost Breakdown Analysis - Enhanced to include all cost types
-    $stmt = $conn->query("
-        SELECT 
-            SUM(CASE WHEN rm.type = 'bahan' THEN pr.quantity * rm.purchase_price_per_unit / rm.default_package_quantity ELSE 0 END) as bahan_cost,
-            SUM(CASE WHEN rm.type = 'kemasan' THEN pr.quantity * rm.purchase_price_per_unit / rm.default_package_quantity ELSE 0 END) as kemasan_cost
-        FROM product_recipes pr
-        JOIN raw_materials rm ON pr.raw_material_id = rm.id
-    ");
-    $breakdown = $stmt->fetch();
-    
-    if ($breakdown) {
-        $costBreakdown['bahan_baku'] = $breakdown['bahan_cost'] ?? 0;
-        $costBreakdown['kemasan'] = $breakdown['kemasan_cost'] ?? 0;
-    }
-
-    // Add labor and overhead costs to breakdown
-    $costBreakdown['tenaga_kerja'] = $totalLaborCost;
-    $costBreakdown['overhead'] = $totalOverheadCost;
-
 } catch (PDOException $e) {
     error_log("Error di Dashboard: " . $e->getMessage());
-    // Variables are already initialized above, so no need to reinitialize
 }
 ?>
 
@@ -281,10 +329,10 @@ try {
                     <p class="text-gray-600">Analisis Harga Pokok Produksi dengan metode Full Costing</p>
                 </div>
 
-                <!-- Main Stats Cards -->
+                <!-- Integrated Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <!-- Total Products -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,11 +343,16 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Total Produk</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($totalProducts); ?></p>
-                        <p class="text-xs text-gray-500">Produk terdaftar</p>
+                        <div class="flex items-center text-xs text-gray-500">
+                            <svg class="w-3 h-3 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 12L8 10l1.41-1.41L10 9.17l.59-.58L12 10l-2 2z"/>
+                            </svg>
+                            <?php echo number_format($totalRecipes); ?> dengan resep
+                        </div>
                     </div>
 
                     <!-- Average Margin -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,11 +363,16 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Rata-rata Margin</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($avgMargin, 1); ?>%</p>
-                        <p class="text-xs text-gray-500">Margin keuntungan</p>
+                        <div class="flex items-center text-xs <?php echo $avgMargin >= 15 ? 'text-green-500' : 'text-yellow-500'; ?>">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 12L8 10l1.41-1.41L10 9.17l.59-.58L12 10l-2 2z"/>
+                            </svg>
+                            Target: 15-20%
+                        </div>
                     </div>
 
                     <!-- Average HPP -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-purple-400 to-purple-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,11 +383,11 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Rata-rata HPP</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1">Rp <?php echo number_format($avgHPP, 0, ',', '.'); ?></p>
-                        <p class="text-xs text-gray-500">Per unit produk</p>
+                        <div class="text-xs text-gray-500">Per unit produk</div>
                     </div>
 
                     <!-- Profitable Products -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,16 +396,16 @@ try {
                             </div>
                             <span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">Produk Profit > 0</span>
                         </div>
-                        <h3 class="text-sm font-semibold text-gray-600 mb-2">Produk Profit > 0</h3>
+                        <h3 class="text-sm font-semibold text-gray-600 mb-2">Produk Menguntungkan</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($profitableProducts); ?></p>
-                        <p class="text-xs text-gray-500">Produk menguntungkan</p>
+                        <div class="text-xs text-gray-500">dari <?php echo number_format($total_products_ranking); ?> produk</div>
                     </div>
                 </div>
 
-                <!-- Additional Integrated Stats Cards -->
+                <!-- Additional Component Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <!-- Resep Aktif -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -358,11 +416,13 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Resep Aktif</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($totalRecipes); ?></p>
-                        <p class="text-xs text-gray-500">Produk dengan resep</p>
+                        <div class="text-xs text-gray-500">
+                            <?php echo $totalProducts > 0 ? number_format(($totalRecipes / $totalProducts) * 100, 1) : 0; ?>% coverage
+                        </div>
                     </div>
 
                     <!-- Total Bahan Baku -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-amber-400 to-amber-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,11 +433,11 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Total Bahan Baku</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($totalBahanBaku); ?></p>
-                        <p class="text-xs text-gray-500"><?php echo number_format($totalKemasan); ?> kemasan</p>
+                        <div class="text-xs text-gray-500"><?php echo number_format($totalKemasan); ?> kemasan</div>
                     </div>
 
                     <!-- Total Tenaga Kerja -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-orange-400 to-orange-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,11 +448,11 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Total Tenaga Kerja</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($totalLaborPositions); ?></p>
-                        <p class="text-xs text-gray-500">Rp <?php echo number_format($totalLaborCost, 0, ',', '.'); ?>/jam</p>
+                        <div class="text-xs text-gray-500">Rp <?php echo number_format($totalLaborCost, 0, ',', '.'); ?>/jam</div>
                     </div>
 
                     <!-- Total Overhead -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100 transform hover:scale-105 transition-transform duration-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="w-12 h-12 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -403,7 +463,7 @@ try {
                         </div>
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">Total Overhead</h3>
                         <p class="text-3xl font-bold text-gray-800 mb-1"><?php echo number_format($totalOverheadItems); ?></p>
-                        <p class="text-xs text-gray-500">Rp <?php echo number_format($totalOverheadCost, 0, ',', '.'); ?></p>
+                        <div class="text-xs text-gray-500">Rp <?php echo number_format($totalOverheadCost, 0, ',', '.'); ?></div>
                     </div>
                 </div>
 
@@ -417,10 +477,39 @@ try {
                                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
                                 </svg>
                             </div>
-                            <h3 class="text-xl font-bold text-gray-900">Ranking Profitabilitas Produk</h3>
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Ranking Profitabilitas Produk</h3>
+                                <p class="text-sm text-gray-600">Produk dengan HPP yang sudah dihitung</p>
+                            </div>
                         </div>
 
                         <div id="ranking-container">
+                            <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div class="flex items-center space-x-2">
+                                    <label for="ranking_limit_select" class="text-sm font-medium text-gray-700">Show:</label>
+                                    <select id="ranking_limit_select" onchange="updateRankingLimit(this.value)" 
+                                            class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                    </select>
+                                    <span class="text-sm text-gray-700">entries</span>
+                                </div>
+
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <input type="text" id="search_ranking_input" 
+                                           placeholder="Cari produk..." 
+                                           onkeyup="searchRanking(this.value)"
+                                           class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                </div>
+                            </div>
+
                             <div class="overflow-x-auto">
                                 <table class="min-w-full">
                                     <thead>
@@ -431,6 +520,7 @@ try {
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Jual</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit per Unit</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Margin (%)</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                         </tr>
                                     </thead>
@@ -438,12 +528,25 @@ try {
                                         <?php if (!empty($profitabilityRanking)): ?>
                                             <?php foreach ($profitabilityRanking as $index => $product): ?>
                                                 <tr class="hover:bg-gray-50">
-                                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo (($ranking_page - 1) * $ranking_limit) + $index + 1; ?></td>
-                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($product['name']); ?></td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                        <span class="inline-flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">
+                                                            <?php echo (($ranking_page - 1) * $ranking_limit) + $index + 1; ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium"><?php echo htmlspecialchars($product['name']); ?></td>
                                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['cost_price'], 0, ',', '.'); ?></td>
                                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['sale_price'], 0, ',', '.'); ?></td>
-                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">Rp <?php echo number_format($product['profit'], 0, ',', '.'); ?></td>
-                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo number_format($product['margin'], 1); ?>%</td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold <?php echo $product['profit'] >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                                        Rp <?php echo number_format($product['profit'], 0, ',', '.'); ?>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold <?php echo $product['margin'] >= 15 ? 'text-green-600' : ($product['margin'] >= 5 ? 'text-yellow-600' : 'text-red-600'); ?>">
+                                                        <?php echo number_format($product['margin'], 1); ?>%
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?php echo $product['stock'] >= 10 ? 'bg-green-100 text-green-800' : ($product['stock'] >= 5 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'); ?>">
+                                                            <?php echo number_format($product['stock']); ?>
+                                                        </span>
+                                                    </td>
                                                     <td class="px-4 py-4 whitespace-nowrap">
                                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?php echo $product['status'] == 'Menguntungkan' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
                                                             <?php echo $product['status']; ?>
@@ -453,7 +556,7 @@ try {
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">Belum ada data produk</td>
+                                                <td colspan="8" class="px-4 py-8 text-center text-gray-500">Belum ada produk dengan HPP yang dihitung</td>
                                             </tr>
                                         <?php endif; ?>
                                     </tbody>
@@ -462,7 +565,7 @@ try {
 
                             <!-- Pagination for Ranking -->
                             <?php if ($total_ranking_pages > 1): ?>
-                            <div class="mt-6 flex justify-between items-center">
+                            <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                                 <div class="text-sm text-gray-700">
                                     Menampilkan <?php echo (($ranking_page - 1) * $ranking_limit) + 1; ?> - 
                                     <?php echo min($ranking_page * $ranking_limit, $total_products_ranking); ?> 
@@ -499,199 +602,125 @@ try {
                         </div>
                     </div>
 
-                    <!-- Right Column -->
-                    <div class="space-y-6">
-                        <!-- System Overview -->
-                        <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                            <div class="flex items-center mb-6">
-                                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                    </svg>
-                                </div>
-                                <h3 class="text-lg font-bold text-gray-900">Overview Sistem</h3>
+                    <!-- Rekomendasi Strategis -->
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                        <div class="flex items-center mb-6">
+                            <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
                             </div>
-
-                            <div class="space-y-4">
-                                <!-- Resep Coverage -->
-                                <div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="text-sm font-medium text-gray-700">Coverage Resep</span>
-                                        <span class="text-sm text-gray-600"><?php echo $totalProducts > 0 ? number_format(($totalRecipes / $totalProducts) * 100, 1) : 0; ?>%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2">
-                                        <div class="bg-indigo-500 h-2 rounded-full" style="width: <?php echo $totalProducts > 0 ? ($totalRecipes / $totalProducts) * 100 : 0; ?>%"></div>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1"><?php echo number_format($totalRecipes); ?> dari <?php echo number_format($totalProducts); ?> produk</div>
-                                </div>
-
-                                <!-- Bahan Baku vs Kemasan -->
-                                <div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="text-sm font-medium text-gray-700">Bahan Baku</span>
-                                        <span class="text-sm text-gray-600"><?php echo $totalRawMaterials > 0 ? number_format(($totalBahanBaku / $totalRawMaterials) * 100, 1) : 0; ?>%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2">
-                                        <div class="bg-amber-500 h-2 rounded-full" style="width: <?php echo $totalRawMaterials > 0 ? ($totalBahanBaku / $totalRawMaterials) * 100 : 0; ?>%"></div>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1"><?php echo number_format($totalBahanBaku); ?> bahan, <?php echo number_format($totalKemasan); ?> kemasan</div>
-                                </div>
-
-                                <!-- Cost Breakdown -->
-                                <?php
-                                $totalCost = array_sum($costBreakdown);
-                                $colors = [
-                                    'bahan_baku' => 'blue', 
-                                    'kemasan' => 'green', 
-                                    'tenaga_kerja' => 'orange',
-                                    'overhead' => 'purple'
-                                ];
-                                $labels = [
-                                    'bahan_baku' => 'Bahan Baku', 
-                                    'kemasan' => 'Kemasan', 
-                                    'tenaga_kerja' => 'Tenaga Kerja',
-                                    'overhead' => 'Overhead'
-                                ];
-                                ?>
-                                <?php foreach ($costBreakdown as $type => $cost): ?>
-                                    <?php 
-                                    $percentage = $totalCost > 0 ? ($cost / $totalCost) * 100 : 0;
-                                    $color = $colors[$type];
-                                    ?>
-                                    <div>
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-700"><?php echo $labels[$type]; ?></span>
-                                            <span class="text-sm text-gray-600"><?php echo number_format($percentage, 1); ?>%</span>
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-<?php echo $color; ?>-500 h-2 rounded-full" style="width: <?php echo $percentage; ?>%"></div>
-                                        </div>
-                                        <div class="text-xs text-gray-500 mt-1">Rp <?php echo number_format($cost, 0, ',', '.'); ?></div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
+                            <h3 class="text-lg font-bold text-gray-900">Rekomendasi Strategis</h3>
                         </div>
 
-                        <!-- Rekomendasi Strategis -->
-                        <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                            <div class="flex items-center mb-6">
-                                <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-                                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                                    </svg>
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-blue-800 mb-2">Tips Umum</h4>
+                                        <ul class="text-sm text-blue-700 space-y-1">
+                                            <li>• Target margin minimum 15-20% untuk UMKM makanan</li>
+                                            <li>• Review HPP setiap bulan karena fluktuasi harga bahan</li>
+                                            <li>• Negosiasi dengan supplier untuk pembelian dalam jumlah besar</li>
+                                        </ul>
+                                    </div>
                                 </div>
-                                <h3 class="text-lg font-bold text-gray-900">Rekomendasi Strategis</h3>
                             </div>
 
-                            <div class="space-y-4">
-                                <div class="bg-blue-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-blue-800 mb-2">Tips Umum</h4>
-                                            <ul class="text-sm text-blue-700 space-y-1">
-                                                <li>• Target margin minimum 15-20% untuk UMKM makanan</li>
-                                                <li>• Review HPP setiap bulan karena fluktuasi harga bahan</li>
-                                                <li>• Negosiasi dengan supplier untuk pembelian dalam jumlah besar</li>
-                                            </ul>
-                                        </div>
+                            <?php if ($totalRecipes < $totalProducts && $totalProducts > 0): ?>
+                            <div class="bg-amber-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-amber-800 mb-2">Lengkapi Resep</h4>
+                                        <p class="text-sm text-amber-700">
+                                            <?php echo $totalProducts - $totalRecipes; ?> produk belum memiliki resep. 
+                                            Lengkapi resep untuk perhitungan HPP yang akurat.
+                                        </p>
                                     </div>
                                 </div>
-
-                                <?php if ($totalRecipes < $totalProducts && $totalProducts > 0): ?>
-                                <div class="bg-amber-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-amber-800 mb-2">Lengkapi Resep</h4>
-                                            <p class="text-sm text-amber-700">
-                                                <?php echo $totalProducts - $totalRecipes; ?> produk belum memiliki resep. 
-                                                Lengkapi resep untuk perhitungan HPP yang akurat.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-
-                                <?php if ($totalLaborPositions == 0): ?>
-                                <div class="bg-orange-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-orange-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-orange-800 mb-2">Setup Tenaga Kerja</h4>
-                                            <p class="text-sm text-orange-700">
-                                                Belum ada data tenaga kerja. Tambahkan posisi & upah untuk kalkulasi HPP lengkap.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-
-                                <?php if ($totalOverheadItems == 0): ?>
-                                <div class="bg-emerald-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-emerald-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-emerald-800 mb-2">Setup Overhead</h4>
-                                            <p class="text-sm text-emerald-700">
-                                                Belum ada data overhead. Tambahkan biaya listrik, sewa, dll untuk HPP akurat.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-
-                                <?php if ($avgMargin < 15): ?>
-                                <div class="bg-red-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-red-800 mb-2">Peringatan Margin</h4>
-                                            <p class="text-sm text-red-700">Margin rata-rata Anda di bawah 15%. Pertimbangkan untuk menaikkan harga jual atau efisiensi biaya.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-
-                                <?php if ($lowStockProducts > 0 || $lowStockMaterials > 0): ?>
-                                <div class="bg-yellow-50 rounded-lg p-4">
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </div>
-                                        <div class="ml-3">
-                                            <h4 class="text-sm font-semibold text-yellow-800 mb-2">Stok Rendah</h4>
-                                            <p class="text-sm text-yellow-700">
-                                                Ada <?php echo $lowStockProducts + $lowStockMaterials; ?> item dengan stok rendah. 
-                                                Segera lakukan restock untuk menghindari kehabisan stok.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
                             </div>
+                            <?php endif; ?>
+
+                            <?php if ($totalLaborPositions == 0): ?>
+                            <div class="bg-orange-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-orange-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-orange-800 mb-2">Setup Tenaga Kerja</h4>
+                                        <p class="text-sm text-orange-700">
+                                            Belum ada data tenaga kerja. Tambahkan posisi & upah untuk kalkulasi HPP lengkap.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($totalOverheadItems == 0): ?>
+                            <div class="bg-emerald-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-emerald-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-emerald-800 mb-2">Setup Overhead</h4>
+                                        <p class="text-sm text-emerald-700">
+                                            Belum ada data overhead. Tambahkan biaya listrik, sewa, dll untuk HPP akurat.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($avgMargin > 0 && $avgMargin < 15): ?>
+                            <div class="bg-red-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-red-800 mb-2">Peringatan Margin</h4>
+                                        <p class="text-sm text-red-700">Margin rata-rata Anda di bawah 15%. Pertimbangkan untuk menaikkan harga jual atau efisiensi biaya.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($lowStockProducts > 0 || $lowStockMaterials > 0): ?>
+                            <div class="bg-yellow-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-semibold text-yellow-800 mb-2">Stok Rendah</h4>
+                                        <p class="text-sm text-yellow-700">
+                                            Ada <?php echo $lowStockProducts + $lowStockMaterials; ?> item dengan stok rendah. 
+                                            Segera lakukan restock untuk menghindari kehabisan stok.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -744,16 +773,69 @@ try {
 </div>
 
 <script>
-function loadRankingData(page) {
-    fetch(`dashboard.php?ajax=ranking&ranking_page=${page}`)
-        .then(response => response.text())
-        .then(data => {
-            document.getElementById('ranking-container').innerHTML = data;
+// Global variables for search and pagination state
+let currentRankingPage = 1;
+let currentRankingLimit = 10;
+let currentSearchTerm = '';
+let searchTimeout;
+
+function loadRankingData(page = 1, limit = null, search = null) {
+    if (limit !== null) currentRankingLimit = limit;
+    if (search !== null) currentSearchTerm = search;
+    currentRankingPage = page;
+
+    const container = document.getElementById('ranking-container');
+    if (!container) return;
+
+    // Show loading
+    const loadingHTML = `
+        <div class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+            <span class="ml-2 text-gray-600">Memuat ranking...</span>
+        </div>
+    `;
+    container.innerHTML = loadingHTML;
+
+    const params = new URLSearchParams({
+        ajax: 'ranking',
+        ranking_page: currentRankingPage,
+        ranking_limit: currentRankingLimit,
+        search_ranking: currentSearchTerm
+    });
+
+    fetch(`dashboard.php?${params.toString()}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            container.innerHTML = html;
         })
         .catch(error => {
             console.error('Error loading ranking data:', error);
+            container.innerHTML = '<div class="text-center text-red-500 py-8">Error loading ranking data. Please try again.</div>';
         });
 }
+
+function updateRankingLimit(newLimit) {
+    currentRankingLimit = parseInt(newLimit);
+    loadRankingData(1, currentRankingLimit, currentSearchTerm);
+}
+
+function searchRanking(searchTerm) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentSearchTerm = searchTerm.trim();
+        loadRankingData(1, currentRankingLimit, currentSearchTerm);
+    }, 500); // Debounce search for 500ms
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard loaded successfully');
+});
 </script>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>
