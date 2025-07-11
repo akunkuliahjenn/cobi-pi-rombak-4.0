@@ -1,7 +1,7 @@
-<?php 
-// includes/sidebar.php 
+<?php
+// includes/sidebar.php
 // File ini berisi struktur sidebar navigasi untuk aplikasi HPP Full Costing
-// Pastikan session sudah dimulai dan user_role tersedia 
+// Pastikan session sudah dimulai dan user_role tersedia
 $user_role = $_SESSION['user_role'] ?? 'guest';
 
 // Determine current page for highlighting
@@ -52,7 +52,7 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
                         <span>Manajemen Bahan </span>
                         <span>Baku & Kemasan</span>
                     </div>
-                </a></old_str>
+                </a>
 
                 <a href="/cornerbites-sia/pages/overhead_management.php" class="flex items-start py-3 px-4 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 group <?php echo ($current_page == 'overhead_management.php') ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600' : ''; ?>">
                     <svg class="w-5 h-5 mr-3 mt-0.5 text-gray-500 group-hover:text-gray-700 <?php echo ($current_page == 'overhead_management.php') ? 'text-blue-600' : ''; ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,8 +100,20 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
         <?php endif; ?>
     </nav>
 
-    <!-- Tombol Logout di bagian bawah sidebar -->
+    <!-- User Info dan Tombol Logout di bagian bawah sidebar -->
     <div class="p-4 border-t border-gray-100">
+        <!-- User Info -->
+        <div class="flex items-center mb-4 p-3 bg-gray-50 rounded-lg">
+            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                <span class="text-white font-semibold text-sm"><?php echo strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)); ?></span>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium text-gray-800"><?php echo htmlspecialchars($_SESSION['username'] ?? 'Pengguna'); ?></p>
+                <p class="text-xs text-gray-500"><?php echo ucfirst($_SESSION['user_role'] ?? 'user'); ?></p>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
         <button id="logout-btn" class="flex items-center justify-center py-3 px-4 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 transition-all duration-200 w-full group">
             <svg class="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>

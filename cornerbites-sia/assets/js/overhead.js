@@ -72,20 +72,20 @@ function formatRupiahInput(element) {
 
 // Edit overhead
 function editOverhead(overhead) {
-    // Sekarang fungsi menerima satu objek 'overhead'
+    // Set form values
     document.getElementById('overhead_id_to_edit').value = overhead.id;
     document.getElementById('overhead_name').value = overhead.name;
     document.getElementById('overhead_description').value = overhead.description || '';
-    
+
     // Format amount untuk ditampilkan dengan benar
     const amountInput = document.getElementById('overhead_amount');
-    amountInput.value = overhead.amount ? new Intl.NumberFormat('id-ID').format(overhead.amount) : '';
+    amountInput.value = overhead.amount ? formatNumber(overhead.amount) : '';
 
     // Set metode alokasi dan estimasi pemakaian
-    document.getElementById('allocation_method').value = overhead.allocation_method || 'per_batch'; // Default ke per_batch jika null
+    document.getElementById('allocation_method').value = overhead.allocation_method || 'per_batch';
     document.getElementById('estimated_uses').value = overhead.estimated_uses || 1;
 
-    // Ubah tampilan tombol dan judul form
+    // Update form UI untuk mode edit
     document.getElementById('overhead_form_title').textContent = 'Edit Biaya Overhead';
     document.getElementById('overhead_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,6 +93,13 @@ function editOverhead(overhead) {
         </svg>
         Update Overhead
     `;
+
+    // Update button colors for edit mode
+    const submitButton = document.getElementById('overhead_submit_button');
+    submitButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    submitButton.classList.add('bg-orange-600', 'hover:bg-orange-700');
+
+    // Show cancel button
     document.getElementById('overhead_cancel_edit_button').classList.remove('hidden');
 
     // Scroll ke form agar terlihat oleh pengguna
@@ -107,19 +114,27 @@ function editLabor(labor) {
     document.getElementById('labor_id_to_edit').value = labor.id;
     document.getElementById('labor_position_name').value = labor.position_name;
 
-    // Format hourly rate value untuk editing - langsung set dengan format yang benar
+    // Format hourly rate value untuk editing
     const rateInput = document.getElementById('labor_hourly_rate');
     const rateValue = parseInt(labor.hourly_rate);
     const formattedRate = formatNumber(rateValue);
     rateInput.value = formattedRate;
 
+    // Update form title and button
     document.getElementById('labor_form_title').textContent = 'Edit Posisi Tenaga Kerja';
     document.getElementById('labor_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
         </svg>
         Update Posisi
     `;
+
+    // Update button colors for edit mode
+    const submitButton = document.getElementById('labor_submit_button');
+    submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+    submitButton.classList.add('bg-orange-600', 'hover:bg-orange-700');
+
+    // Show cancel button
     document.getElementById('labor_cancel_edit_button').classList.remove('hidden');
 
     // Scroll to form labor
@@ -204,41 +219,17 @@ function loadLaborData(page = 1) {
         });
 }
 
-function editOverhead(overhead) {
-    // Sekarang fungsi menerima satu objek 'overhead'
-    document.getElementById('overhead_id_to_edit').value = overhead.id;
-    document.getElementById('overhead_name').value = overhead.name;
-    document.getElementById('overhead_description').value = overhead.description || '';
-    
-    // Format amount untuk ditampilkan dengan benar
-    const amountInput = document.getElementById('overhead_amount');
-    amountInput.value = overhead.amount ? new Intl.NumberFormat('id-ID').format(overhead.amount) : '';
-
-    // Set metode alokasi dan estimasi pemakaian
-    document.getElementById('allocation_method').value = overhead.allocation_method || 'per_batch'; // Default ke per_batch jika null
-    document.getElementById('estimated_uses').value = overhead.estimated_uses || 1;
-
-    // Ubah tampilan tombol dan judul form
-    document.getElementById('overhead_form_title').textContent = 'Edit Biaya Overhead';
-    document.getElementById('overhead_submit_button').innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-        </svg>
-        Update Overhead
-    `;
-    document.getElementById('overhead_cancel_edit_button').classList.remove('hidden');
-
-    // Scroll ke form agar terlihat oleh pengguna
-    document.getElementById('overhead_form_title').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 // Reset Overhead form
 function resetOverheadForm() {
+    // Reset form values
     document.getElementById('overhead_id_to_edit').value = '';
     document.getElementById('overhead_name').value = '';
-    document.getElementById('overhead_amount').value = '';
     document.getElementById('overhead_description').value = '';
+    document.getElementById('overhead_amount').value = '';
+    document.getElementById('allocation_method').value = 'per_batch';
+    document.getElementById('estimated_uses').value = '1';
 
+    // Reset form UI ke mode tambah
     document.getElementById('overhead_form_title').textContent = 'Tambah Biaya Overhead Baru';
     document.getElementById('overhead_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,36 +237,24 @@ function resetOverheadForm() {
         </svg>
         Tambah Overhead
     `;
-    document.getElementById('overhead_submit_button').classList.remove('bg-orange-600', 'hover:bg-orange-700');
-    document.getElementById('overhead_submit_button').classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+    // Reset button colors ke mode tambah
+    const submitButton = document.getElementById('overhead_submit_button');
+    submitButton.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+    submitButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+    // Hide cancel button
     document.getElementById('overhead_cancel_edit_button').classList.add('hidden');
-}
-
-// Edit Labor function
-function editLabor(labor) {
-    document.getElementById('labor_id_to_edit').value = labor.id;
-    document.getElementById('labor_position_name').value = labor.position_name;
-    document.getElementById('labor_hourly_rate').value = numberFormat(labor.hourly_rate);
-
-    // Update form title and button
-    document.getElementById('labor_form_title').textContent = 'Edit Posisi Tenaga Kerja';
-    document.getElementById('labor_submit_button').innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-        </svg>
-        Update Posisi
-    `;
-    document.getElementById('labor_submit_button').classList.remove('bg-green-600', 'hover:bg-green-700');
-    document.getElementById('labor_submit_button').classList.add('bg-orange-600', 'hover:bg-orange-700');
-    document.getElementById('labor_cancel_edit_button').classList.remove('hidden');
 }
 
 // Reset Labor form
 function resetLaborForm() {
+    // Reset form values
     document.getElementById('labor_id_to_edit').value = '';
     document.getElementById('labor_position_name').value = '';
     document.getElementById('labor_hourly_rate').value = '';
 
+    // Reset form UI ke mode tambah
     document.getElementById('labor_form_title').textContent = 'Tambah Posisi Tenaga Kerja Baru';
     document.getElementById('labor_submit_button').innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,8 +262,13 @@ function resetLaborForm() {
         </svg>
         Tambah Posisi
     `;
-    document.getElementById('labor_submit_button').classList.remove('bg-orange-600', 'hover:bg-orange-700');
-    document.getElementById('labor_submit_button').classList.add('bg-green-600', 'hover:bg-green-700');
+
+    // Reset button colors ke mode tambah
+    const submitButton = document.getElementById('labor_submit_button');
+    submitButton.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+    submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
+
+    // Hide cancel button
     document.getElementById('labor_cancel_edit_button').classList.add('hidden');
 }
 
@@ -705,34 +689,3 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.removeItem('laborSearch');
     }
 });
-
-function editOverhead(id, name, description, amount, method, estimatedUses) {
-    document.getElementById('overhead_id_to_edit').value = id;
-    document.getElementById('overhead_name').value = name;
-    document.getElementById('overhead_description').value = description;
-    document.getElementById('overhead_amount').value = formatNumber(amount);
-    document.getElementById('allocation_method').value = method;
-    document.getElementById('estimated_uses').value = estimatedUses || 1;
-}
-
-function resetOverheadForm() {
-    const form = document.querySelector('form[action*="simpan_overhead"][method="POST"]');
-    if (form) {
-        // Hanya reset input overhead, bukan semua form
-        document.getElementById('overhead_id_to_edit').value = '';
-        document.getElementById('overhead_name').value = '';
-        document.getElementById('overhead_description').value = '';
-        document.getElementById('overhead_amount').value = '';
-        document.getElementById('allocation_method').value = 'per_batch';
-        document.getElementById('estimated_uses').value = '1';
-    }
-
-    document.getElementById('overhead_form_title').textContent = 'Tambah Biaya Overhead Baru';
-    document.getElementById('overhead_submit_button').innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-        Tambah Overhead
-    `;
-    document.getElementById('overhead_cancel_edit_button').classList.add('hidden');
-}
